@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signInAnonymously, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from '../firebase';
 
 const AuthContext = createContext();
@@ -17,10 +17,13 @@ export const AuthProvider = ({ children }) => {
                 setUser(currentUser);
                 const userDocRef = doc(db, "users", currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
-                const role = currentUser.isAnonymous 
-                    ? 'colaborador' 
-                    : (userDocSnap.exists() && userDocSnap.data().role === 'gestor' ? 'gestor' : 'colaborador');
-                setUserRole(role);
+                if (userDocSnap.exists()) {
+                    setUserRole(userDocSnap.data().role);
+                } else {
+                    // Se o documento não existe, pode ser um novo usuário
+                    // A role será definida durante o cadastro
+                    setUserRole(null);
+                }
             } else {
                 setUser(null);
                 setUserRole(null);
@@ -30,11 +33,24 @@ export const AuthProvider = ({ children }) => {
         return unsubscribe;
     }, []);
 
-    const loginGestor = (email, password) => signInWithEmailAndPassword(auth, email, password);
-    const loginColaborador = () => signInAnonymously(auth);
+    const loginUser = (email, password) => signInWithEmailAndPassword(auth, email, password);
+
+    const registerUser = async (email, password, role = 'colaborador') => {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        // Cria um documento para o usuário com sua role
+        await setDoc(doc(db, "users", user.uid), {
+            uid: user.uid,
+            email: user.email,
+            role: role,
+            criadoEm: new Date()
+        });
+        return userCredential;
+    };
+
     const logout = () => signOut(auth);
 
-    const value = { user, userRole, loadingAuth, loginGestor, loginColaborador, logout };
+    const value = { user, userRole, loadingAuth, loginUser, registerUser, logout };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

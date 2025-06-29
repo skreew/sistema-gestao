@@ -32,7 +32,7 @@ export const DataProvider = ({ children }) => {
 
         if (userRole === 'gestor') {
             collectionsToFetch.push({ name: "insumos", setter: setInsumos, orderByField: "nome" });
-            collectionsToFetch.push({ name: "produtos", setter: setProdutos, orderByField: "nome" });
+            collectionsToFetch.push({ name: "produtosFinais", setter: setProdutos, orderByField: "nome" });
         }
 
         setLoadingData(true);

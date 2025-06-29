@@ -57,7 +57,8 @@ const PedidosView = () => {
                 fornecedorNome: fornecedor.nome,
                 itens: itensDoPedido,
                 solicitanteEmail: user.isAnonymous ? 'Colaborador Anônimo' : user.email,
-                status: 'enviado'
+                status: 'enviado',
+                valorTotal: 0 // Valor inicial
             });
         } catch (error) {
             showModal("Erro ao salvar pedido no histórico: " + error.message);

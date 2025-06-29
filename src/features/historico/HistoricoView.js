@@ -20,6 +20,7 @@ const HistoricoView = () => {
                             <p><strong>Fornecedor:</strong> {pedido.fornecedorNome}</p>
                             <p className="sub-text"><strong>Data:</strong> {formatarData(pedido.criadoEm)}</p>
                             <p className="sub-text"><strong>Solicitante:</strong> {pedido.solicitanteEmail}</p>
+                            <p className="sub-text"><strong>Status:</strong> {pedido.status}</p>
                             <ul>{pedido.itens.map((item, index) => <li key={index}>- {item.qtd}x {item.nome}</li>)}</ul>
                         </div>
                         <p><strong>{formatarValor(pedido.valorTotal)}</strong></p>
