@@ -1,0 +1,295 @@
+/* --- Paleta de Cores Ipiranga --- */
+:root {
+  --cor-primaria: #0033A0;      /* Azul Ipiranga */
+  --cor-primaria-hover: #002678; /* Azul Ipiranga mais escuro para hover */
+  --cor-secundaria: #FECB00;     /* Amarelo Ipiranga */
+  --cor-secundaria-hover: #eab600;/* Amarelo Ipiranga mais escuro para hover */
+  
+  --cor-fundo: #f8f9fa;         /* Cinza bem claro para o fundo da página */
+  --cor-borda: #dee2e6;         /* Cinza para bordas */
+  --cor-texto-principal: #212529;  /* Preto/Cinza escuro para textos */
+  --cor-texto-secundario: #6c757d; /* Cinza médio para subtextos */
+  --cor-perigo: #dc3545;         /* Vermelho para ações de perigo */
+
+  --sombra-card: 0 4px 12px rgba(0, 0, 0, 0.08); /* Sombra mais suave */
+}
+
+/* --- Layout Principal --- */
+.App {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--cor-fundo); /* Aplica o fundo geral */
+}
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: white;
+  border-bottom: 1px solid var(--cor-borda);
+  box-shadow: var(--sombra-card);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.main-nav {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem;
+  background-color: var(--cor-primaria); /* Barra de navegação com o azul principal */
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.container {
+  padding: 2rem;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.loading-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--cor-primaria);
+}
+
+/* --- Componentes de UI --- */
+.card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem 2rem;
+  box-shadow: var(--sombra-card);
+  margin-bottom: 2rem;
+  border: 1px solid var(--cor-borda);
+}
+.card h2, .card h3 {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--cor-texto-principal);
+}
+.card h3 { font-size: 1.25rem; }
+.divider {
+  border-top: 1px solid var(--cor-borda);
+  margin: 2rem 0;
+}
+.divider-soft {
+  border-top: 1px solid #f0f0f0;
+  margin: 1rem 0;
+}
+.icon {
+  width: 1.5em;
+  height: 1.5em;
+  stroke-width: 1.5;
+  display: inline-block;
+  vertical-align: middle;
+}
+.icon.small {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+/* --- Botões --- */
+button {
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600; /* Dando mais destaque ao texto do botão */
+  transition: all 0.2s ease-in-out;
+  line-height: 1.5;
+}
+.button-primary {
+  background-color: var(--cor-primaria);
+  color: white;
+}
+.button-primary:hover {
+  background-color: var(--cor-primaria-hover);
+}
+.button-secondary {
+  background-color: var(--cor-secundaria);
+  color: var(--cor-texto-principal); /* Texto escuro para contraste com o amarelo */
+}
+.button-secondary:hover {
+  background-color: var(--cor-secundaria-hover);
+}
+.button-link {
+  background: none;
+  color: var(--cor-primaria);
+  text-decoration: underline;
+  padding: 0.5rem;
+}
+.button-icon {
+  background: none;
+  padding: 0.5rem;
+  border: none;
+  opacity: 0.7;
+}
+.button-icon:hover {
+  opacity: 1;
+}
+.button-icon .icon {
+  color: var(--cor-texto-secundario);
+}
+.button-icon:hover .icon {
+  color: var(--cor-primaria);
+}
+.button-icon .lixeira:hover .icon {
+  color: var(--cor-perigo);
+}
+
+/* --- Navegação --- */
+.nav-button {
+  background-color: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+.nav-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+.nav-button.active {
+  background-color: var(--cor-secundaria); /* Botão ativo em amarelo para destaque */
+  color: var(--cor-texto-principal); /* Texto escuro para contraste */
+}
+
+/* --- Formulários --- */
+.form-group {
+  margin-bottom: 1.25rem;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--cor-texto-secundario);
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px rgba(0, 51, 160, 0.25); /* Sombra de foco com a cor primária */
+}
+.form-group-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+.form-group-inline .form-group {
+  flex: 1;
+  min-width: 150px;
+}
+
+/* --- Listas --- */
+.list-container {
+  max-height: 450px;
+  overflow-y: auto;
+  padding-right: 1rem;
+  border-top: 1px solid var(--cor-borda);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+.list-item:last-child {
+  border-bottom: none;
+}
+.list-item-info strong {
+  font-size: 1.05rem;
+  color: var(--cor-texto-principal);
+}
+.sub-text {
+  font-size: 0.85rem;
+  color: var(--cor-texto-secundario);
+  margin-top: 0.25rem;
+}
+
+/* --- Layouts Responsivos --- */
+.grid-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 2rem;
+}
+
+/* --- Modal --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 95%;
+  max-width: 600px;
+}
+.modal-content.large {
+  max-width: 900px;
+}
+.modal-actions {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+.modal-body {
+  margin-top: 1.5rem;
+}
+
+/* --- Páginas de Login --- */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+.login-card .button-primary.large {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.2rem;
+}
+.access-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}

@@ -1,0 +1,45 @@
+// Arquivo: firestore.rules (versão com Histórico de Pedidos)
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isGestor() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gestor';
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isGestor();
+      allow get: if request.auth.uid == userId;
+    }
+
+    // Acesso liberado para Colaboradores e Gestor
+    match /fornecedores/{docId} {
+      allow read, write: if isSignedIn();
+    }
+    match /produtosDeCompra/{docId} {
+        allow read, write: if isSignedIn();
+    }
+    
+    // --- NOVO ---
+    // Histórico de pedidos pode ser criado e lido por todos
+    match /pedidosRealizados/{docId} {
+        allow read, write: if isSignedIn();
+    }
+    // --- FIM NOVO ---
+
+    // Acesso restrito apenas para Gestores
+    match /insumos/{docId} {
+      allow read, write: if isGestor();
+    }
+    match /produtos/{docId} {
+      allow read, write: if isGestor();
+    }
+  }
+}
