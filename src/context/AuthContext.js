@@ -12,17 +12,12 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoadingAuth(true);
             if (currentUser) {
                 setUser(currentUser);
                 const userDocRef = doc(db, "users", currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     setUserRole(userDocSnap.data().role);
-                } else {
-                    // Se o documento não existe, pode ser um novo usuário
-                    // A role será definida durante o cadastro
-                    setUserRole(null);
                 }
             } else {
                 setUser(null);
@@ -38,7 +33,6 @@ export const AuthProvider = ({ children }) => {
     const registerUser = async (email, password, role = 'colaborador') => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        // Cria um documento para o usuário com sua role
         await setDoc(doc(db, "users", user.uid), {
             uid: user.uid,
             email: user.email,

@@ -2,10 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { useUI } from '../../context/UIContext';
 import { setDocument, incrementField, addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
-import { IconeCmv, IconePizza, IconeEditar, IconeLixeira, IconeSalvar } from '../../utils/icons';
+import { IconeCmv, IconeFichaTecnica, IconeEditar, IconeLixeira, IconeSalvar } from '../../utils/icons';
 import { formatarValor, formatarValorPreciso } from '../../utils/formatters';
 
-// --- Sub-componente para Registrar Compra ---
 const RegistrarCompra = () => {
     const { produtosDeCompra, allPedidos } = useData();
     const { showModal } = useUI();
@@ -95,7 +94,6 @@ const RegistrarCompra = () => {
     );
 };
 
-// --- Sub-componente para Gerenciar Produtos Finais (Ficha Técnica) ---
 const GerenciarProdutosFinais = () => {
     const { insumos, produtos } = useData();
     const { showModal, showConfirmationModal } = useUI();
@@ -232,7 +230,7 @@ const GerenciarProdutosFinais = () => {
 
     return (
         <div className="card">
-            <h2><IconePizza /> Gerenciar Produtos Finais (Ficha Técnica)</h2>
+            <h2><IconeFichaTecnica /> Gerenciar Produtos Finais (Ficha Técnica)</h2>
             <form onSubmit={handleSalvarProdutoFinal}>
                 <div className="form-group-inline">
                     <div className="form-group"><label>Nome do Produto</label><input type="text" value={formState.nome} onChange={e => setFormState({...formState, nome: e.target.value})} placeholder="Ex: Pizza" required/></div>
@@ -278,7 +276,7 @@ const GerenciarProdutosFinais = () => {
             </form>
 
             <div className="divider" />
-            <h3><IconePizza /> Produtos Finais Cadastrados</h3>
+            <h3><IconeFichaTecnica /> Produtos Finais Cadastrados</h3>
             <div className="form-group"><label>Margem de Lucro para Preço Sugerido (%)</label><input type="number" value={margemLucro} onChange={e => setMargemLucro(Number(e.target.value))} /></div>
             <div className="list-container">
                 {produtos.map(p => (
@@ -307,7 +305,6 @@ const GerenciarProdutosFinais = () => {
     );
 };
 
-// --- Componente Principal da View ---
 const CmvView = () => {
     return (
         <div className="grid-responsive">

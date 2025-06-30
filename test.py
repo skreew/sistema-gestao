@@ -1,9 +1,11 @@
 import os
 import textwrap
 
-# --- Conteúdo dos Arquivos ---
-# Cada variável multiline armazena o conteúdo de um arquivo a ser criado.
-# textwrap.dedent é usado para remover a indentação comum do início das linhas.
+# --- Conteúdo Consolidado e CORRIGIDO dos Arquivos da Aplicação ---
+# Este script contém as correções para os problemas de teste do Cypress.
+# 1. Ajustado o fluxo de registro para manter o usuário logado após o cadastro.
+# 2. Atualizado o teste de registro para validar o login automático.
+# 3. Corrigido o método de validação do cy.session() para ser compatível com Firebase v9+.
 
 PACKAGE_JSON_CONTENT = textwrap.dedent("""
     {
@@ -21,10 +23,14 @@ PACKAGE_JSON_CONTENT = textwrap.dedent("""
         "react-dom": "^18.2.0",
         "react-scripts": "5.0.1"
       },
+      "devDependencies": {
+        "cypress": "^10.11.0"
+      },
       "scripts": {
         "start": "react-scripts start",
         "build": "react-scripts build",
-        "test": "react-scripts test"
+        "test": "react-scripts test",
+        "cypress:open": "cypress open"
       },
       "eslintConfig": { "extends": ["react-app", "react-app/jest"] },
       "browserslist": {
@@ -35,29 +41,28 @@ PACKAGE_JSON_CONTENT = textwrap.dedent("""
 """)
 
 GITIGNORE_CONTENT = textwrap.dedent("""
-    # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-    # dependencies
+    # Dependencies
     /node_modules
     /.pnp
     .pnp.js
 
-    # testing
-    /coverage
-
-    # production
+    # Production
     /build
 
-    # misc
+    # Misc
     .DS_Store
     .env.local
     .env.development.local
     .env.test.local
     .env.production.local
-
     npm-debug.log*
     yarn-debug.log*
     yarn-error.log*
+
+    # Cypress
+    cypress.env.json
+    cypress/videos/
+    cypress/screenshots/
 """)
 
 README_MD_CONTENT = textwrap.dedent("""
@@ -79,8 +84,120 @@ README_MD_CONTENT = textwrap.dedent("""
         ```bash
         npm start
         ```
-
     A aplicação estará disponível em `http://localhost:3000`.
+    
+    ## Como Executar os Testes Automatizados
+
+    1.  Certifique-se de que a aplicação esteja rodando (`npm start`).
+    2.  Em um novo terminal, execute o comando para abrir a interface do Cypress:
+        ```bash
+        npm run cypress:open
+        ```
+    3.  Na janela do Cypress, escolha "E2E Testing" e execute o teste `sistema_completo.cy.js`.
+""")
+
+CYPRESS_CONFIG_JS_CONTENT = textwrap.dedent("""
+    const { defineConfig } = require("cypress");
+
+    module.exports = defineConfig({
+      e2e: {
+        baseUrl: 'http://localhost:3000',
+        experimentalSessionAndOrigin: true,
+        setupNodeEvents(on, config) {
+          // implement node event listeners here
+        },
+      },
+    });
+""")
+
+# CORREÇÕES DE TESTE APLICADAS
+CYPRESS_TEST_FILE_CONTENT = textwrap.dedent("""
+    // cypress/e2e/sistema_completo.cy.js
+
+    describe('Fluxo de Autenticação de Colaborador', () => {
+      it('deve permitir que um novo colaborador se registre e seja logado automaticamente', () => {
+        cy.intercept('POST', '**/identitytoolkit.googleapis.com/**').as('firebaseAuth');
+        cy.intercept('POST', '**/firestore.googleapis.com/**').as('firebaseFirestore');
+
+        const emailColaborador = `colaborador_${Date.now()}@teste.com`;
+        cy.visit('/');
+
+        cy.contains('h1', 'Sistema de Pedidos', { timeout: 10000 }).should('be.visible');
+
+        // --- Registro ---
+        cy.get('[data-cy=btn-show-register]').click();
+        cy.get('[data-cy=input-email-registro]').type(emailColaborador);
+        cy.get('[data-cy=input-senha-registro]').type('senha123');
+        cy.get('[data-cy=btn-register-submit]').click();
+
+        // Espera a confirmação do Firebase e a mensagem de sucesso
+        cy.wait('@firebaseAuth');
+        cy.contains('Cadastro realizado com sucesso!', { timeout: 10000 }).should('be.visible');
+        cy.get('[data-cy=modal-confirm-button]').click();
+
+        // --- Verificação Final ---
+        // O usuário deve ser redirecionado para a página principal, já logado.
+        cy.contains('.user-info', `Bem-vindo, ${emailColaborador}`, { timeout: 10000 }).should('be.visible');
+        cy.get('[data-cy=nav-dashboard]').should('not.exist');
+        cy.get('[data-cy=nav-pedidos]').should('be.visible');
+      });
+    });
+
+    describe('Fluxos do Gestor', () => {
+      beforeEach(() => {
+        cy.intercept('POST', '**/firestore.googleapis.com/**').as('firebaseFirestore');
+
+        cy.session('gestorLogado', () => {
+          cy.visit('/');
+          cy.contains('h1', 'Sistema de Pedidos').should('be.visible');
+          cy.get('[data-cy=btn-show-login]').click();
+          cy.get('[data-cy=input-email-login]').type('admin@gmail.com');
+          cy.get('[data-cy=input-senha-login]').type('admin123');
+          cy.get('[data-cy=btn-login-submit]').click();
+          cy.contains('.user-info', 'Bem-vindo, admin@gmail.com', { timeout: 10000 }).should('be.visible');
+        }, {
+          validate() {
+            // Valida a sessão verificando um elemento que só existe quando logado.
+            cy.get('[data-cy="btn-logout"]').should('be.visible');
+          },
+        });
+        
+        cy.visit('/');
+        cy.contains('.user-info', 'Bem-vindo, admin@gmail.com', { timeout: 10000 }).should('be.visible');
+      });
+
+      it('deve cadastrar um novo fornecedor e verificar todos os dados', () => {
+        const fornecedor = {
+          nome: `Fornecedor Robusto ${Date.now()}`,
+          whatsapp: '11987654321',
+          obs: 'Teste completo de ponta a ponta'
+        };
+
+        cy.get('[data-cy=nav-cadastros]').click();
+        
+        cy.get('[data-cy=card-gerenciar-fornecedores]').within(() => {
+          cy.get('[data-cy=input-fornecedor-nome]').type(fornecedor.nome);
+          cy.get('[data-cy=input-fornecedor-whatsapp]').type(fornecedor.whatsapp);
+          cy.get('[data-cy=input-fornecedor-obs]').type(fornecedor.obs);
+          cy.get('[data-cy=btn-adicionar-fornecedor]').click();
+        });
+        
+        cy.wait('@firebaseFirestore');
+
+        cy.contains('Fornecedor salvo!').should('be.visible');
+        cy.get('[data-cy=modal-confirm-button]').click();
+        
+        const whatsAppFormatado = `(${fornecedor.whatsapp.substring(0, 2)}) ${fornecedor.whatsapp.substring(2, 7)}-${fornecedor.whatsapp.substring(7)}`;
+        
+        cy.get('[data-cy=card-gerenciar-fornecedores] .list-container')
+          .contains(fornecedor.nome)
+          .parents('.list-item')
+          .within(() => {
+            cy.contains(whatsAppFormatado).should('be.visible');
+            cy.contains(fornecedor.obs).should('be.visible');
+          });
+      });
+    });
 """)
 
 INDEX_HTML_CONTENT = textwrap.dedent("""
@@ -98,16 +215,15 @@ INDEX_HTML_CONTENT = textwrap.dedent("""
 
 INDEX_CSS_CONTENT = textwrap.dedent("""
     :root {
-      --cor-primaria: #007bff;
-      --cor-secundaria: #6c757d;
-      --cor-sucesso: #28a745;
-      --cor-perigo: #dc3545;
-      --cor-fundo: #f4f7f9;
-      --cor-texto: #333;
+      --cor-primaria: #0033a0;      /* Azul Ipiranga */
+      --cor-secundaria: #ffde00;    /* Amarelo Ipiranga */
+      --cor-sucesso: #009e4d;       /* Verde Ipiranga */
+      --cor-perigo: #d93025;        /* Vermelho para alertas */
+      --cor-fundo: #f8f9fa;         /* Cinza muito claro */
+      --cor-texto: #212529;         /* Texto escuro */
       --cor-borda: #dee2e6;
-      --sombra-card: 0 4px 8px rgba(0, 0, 0, 0.08);
+      --sombra-card: 0 4px 8px rgba(0, 0, 0, 0.05);
     }
-    
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -119,349 +235,112 @@ INDEX_CSS_CONTENT = textwrap.dedent("""
       color: var(--cor-texto);
       line-height: 1.6;
     }
-
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 """)
 
 APP_CSS_CONTENT = textwrap.dedent("""
     /* --- Layout Principal --- */
-    .App {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    .main-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 2rem;
-      background-color: white;
-      border-bottom: 1px solid var(--cor-borda);
-      box-shadow: var(--sombra-card);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .main-nav {
-      display: flex;
-      justify-content: center;
-      padding: 0.5rem;
-      background-color: #343a40;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    .container {
-      padding: 2rem;
-      width: 100%;
-      max-width: 1600px;
-      margin: 0 auto;
-    }
-    .loading-screen {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      font-size: 1.5rem;
-      font-weight: bold;
-      color: var(--cor-primaria);
-    }
-    
-    /* --- Componentes de UI --- */
-    .card {
-      background-color: white;
-      border-radius: 8px;
-      padding: 1.5rem 2rem;
-      box-shadow: var(--sombra-card);
-      margin-bottom: 2rem;
-    }
-    .card h2, .card h3 {
-      margin-top: 0;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      color: #333;
-    }
-    .card h3 { font-size: 1.25rem; }
-    .card h4 {
-        margin-top: 0;
-        margin-bottom: 1rem;
-        color: #555;
-    }
-    .divider {
-      border-top: 1px solid var(--cor-borda);
-      margin: 2rem 0;
-    }
-    .divider-soft {
-      border-top: 1px solid #f0f0f0;
-      margin: 1rem 0;
-    }
-    .icon {
-      width: 1.5em;
-      height: 1.5em;
-      stroke-width: 1.5;
-      display: inline-block;
-      vertical-align: middle;
-    }
-    .icon.small {
-      width: 1.2em;
-      height: 1.2em;
-    }
-    
-    /* --- Botões --- */
-    button {
-      cursor: pointer;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      padding: 0.6rem 1.2rem;
-      font-size: 0.95rem;
-      font-weight: 500;
-      transition: all 0.2s ease-in-out;
-      line-height: 1.5;
-    }
-    .button-primary {
-      background-color: var(--cor-primaria);
-      color: white;
-    }
-    .button-primary:hover {
-      background-color: #0056b3;
-    }
-    .button-secondary {
-      background-color: var(--cor-secundaria);
-      color: white;
-    }
-    .button-secondary:hover {
-      background-color: #5a6268;
-    }
-    .button-link {
-      background: none;
-      color: var(--cor-primaria);
-      text-decoration: underline;
-      padding: 0.5rem;
-    }
-    .button-icon {
-      background: none;
-      padding: 0.5rem;
-      border: none;
-      opacity: 0.7;
-    }
-    .button-icon:hover {
-      opacity: 1;
-    }
-    
-    /* --- Navegação --- */
-    .nav-button {
-      background-color: transparent;
-      color: rgba(255, 255, 255, 0.8);
-      padding: 0.6rem 1.2rem;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .nav-button:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-      color: white;
-    }
-    .nav-button.active {
-      background-color: var(--cor-primaria);
-      color: white;
-    }
-    
-    /* --- Formulários --- */
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
-    .form-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 500;
-      font-size: 0.9rem;
-    }
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid var(--cor-borda);
-      border-radius: 4px;
-      font-size: 1rem;
-    }
-    .form-group input:focus,
-    .form-group select:focus {
-      outline: none;
-      border-color: var(--cor-primaria);
-      box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-    }
-    .form-group-inline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      align-items: flex-end;
-    }
-    .form-group-inline .form-group {
-      flex: 1;
-      min-width: 150px;
-    }
-    
-    /* --- Listas --- */
-    .list-container {
-      max-height: 450px;
-      overflow-y: auto;
-      padding-right: 1rem;
-      border-top: 1px solid var(--cor-borda);
-      margin-top: 1rem;
-      padding-top: 1rem;
-    }
-    .list-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .list-item:last-child {
-      border-bottom: none;
-    }
-    .list-item-info strong {
-      font-size: 1.05rem;
-    }
-    .sub-text {
-        font-size: 0.85rem;
-        color: #6c757d;
-        margin-top: 0.25rem;
-    }
-    
-    /* --- Layouts Responsivos --- */
-    .grid-responsive {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-      gap: 2rem;
-    }
-    
-    /* --- Modal --- */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.6);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      padding: 1rem;
-    }
-    .modal-content {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      width: 95%;
-      max-width: 600px;
-    }
-    .modal-content.large {
-        max-width: 900px;
-    }
-    .modal-actions {
-      margin-top: 2rem;
-      display: flex;
-      justify-content: flex-end;
-      gap: 1rem;
-    }
-    .modal-body {
-        margin-top: 1.5rem;
-    }
-    
-    /* --- Páginas de Login --- */
-    .login-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-    .login-card {
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-    }
-    
-    /* --- Específicos da Ficha Técnica --- */
-    .variantes-manager {
-      border: 1px solid var(--cor-borda);
-      border-radius: 6px;
-      padding: 1rem;
-      margin-top: 1.5rem;
-    }
-    .variantes-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      border-bottom: 1px solid var(--cor-borda);
-      padding-bottom: 1rem;
-      margin-bottom: 1rem;
-    }
-    .variantes-tabs button {
-      background-color: #f8f9fa;
-      border: 1px solid var(--cor-borda);
-    }
-    .variantes-tabs button.active {
-      background-color: var(--cor-primaria);
-      color: white;
-      border-color: var(--cor-primaria);
-    }
-    .button-add-variant {
-      border-style: dashed;
-    }
-    
-    /* --- Media Queries para Responsividade --- */
-    @media (max-width: 992px) {
-        .grid-responsive {
-          grid-template-columns: 1fr;
-        }
-    }
-    
-    @media (max-width: 768px) {
-      .main-header {
-        flex-direction: column;
-        gap: 0.75rem;
-        padding: 1rem;
-      }
-    
-      .main-nav {
-        padding: 0.5rem;
-        justify-content: space-around;
-      }
-    
-      .nav-button {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.85rem;
-      }
-      
-      .container {
-        padding: 1rem;
-      }
-    
-      .card {
-        padding: 1.25rem;
-      }
+    .App { display: flex; flex-direction: column; min-height: 100vh; }
+    .main-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background-color: white; border-bottom: 1px solid var(--cor-borda); box-shadow: var(--sombra-card); position: sticky; top: 0; z-index: 100; }
+    .main-nav { display: flex; justify-content: center; padding: 0.5rem; background-color: #002b85; gap: 0.5rem; flex-wrap: wrap; }
+    .container { padding: 2rem; width: 100%; max-width: 1600px; margin: 0 auto; }
+    .loading-screen { display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5rem; font-weight: bold; color: var(--cor-primaria); }
 
-      .card h2 {
-        font-size: 1.25rem;
-      }
-    
-      .form-group-inline {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 1rem;
-      }
-    
-      .modal-content {
-        padding: 1.5rem;
-        width: 100%;
-      }
+    /* --- Componentes de UI --- */
+    .card { background-color: white; border-radius: 8px; padding: 1.5rem 2rem; box-shadow: var(--sombra-card); margin-bottom: 2rem; }
+    .card h2, .card h3 { margin-top: 0; display: flex; align-items: center; gap: 0.75rem; color: #333; }
+    .card h3 { font-size: 1.25rem; }
+    .card h4 { margin-top: 0; margin-bottom: 1rem; color: #555; }
+    .divider { border-top: 1px solid var(--cor-borda); margin: 2rem 0; }
+    .divider-soft { border-top: 1px solid #f0f0f0; margin: 1rem 0; }
+    .icon { width: 1.5em; height: 1.5em; stroke-width: 1.5; display: inline-block; vertical-align: middle; }
+    .icon.small { width: 1.2em; height: 1.2em; }
+
+    /* --- Botões --- */
+    button { cursor: pointer; border: 1px solid transparent; border-radius: 4px; padding: 0.6rem 1.2rem; font-size: 0.95rem; font-weight: 500; transition: all 0.2s ease-in-out; line-height: 1.5; }
+    .button-primary { background-color: var(--cor-primaria); color: white; }
+    .button-primary:hover { background-color: #002b85; }
+    .button-secondary { background-color: #6c757d; color: white; }
+    .button-secondary:hover { background-color: #5a6268; }
+    .button-link { background: none; color: var(--cor-primaria); text-decoration: underline; padding: 0.5rem; border: none; }
+    .button-icon { background: none; padding: 0.5rem; border: none; opacity: 0.7; }
+    .button-icon:hover { opacity: 1; }
+
+    /* --- Navegação --- */
+    .nav-button { background-color: transparent; color: rgba(255, 255, 255, 0.8); padding: 0.6rem 1.2rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem; border: none; }
+    .nav-button:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+    .nav-button.active { background-color: var(--cor-secundaria); color: var(--cor-primaria); font-weight: bold;}
+
+    /* --- Formulários --- */
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--cor-borda); border-radius: 4px; font-size: 1rem; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--cor-primaria); box-shadow: 0 0 0 2px rgba(0, 51, 160, 0.25); }
+    .form-group-inline { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+    .form-group-inline .form-group { flex: 1; min-width: 150px; }
+    .input-with-icon { position: relative; }
+    .input-with-icon .icon { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: #6c757d; }
+    .input-with-icon input { padding-left: 40px; }
+
+    /* --- Listas --- */
+    .list-container { max-height: 450px; overflow-y: auto; padding-right: 1rem; border-top: 1px solid var(--cor-borda); margin-top: 1rem; padding-top: 1rem; }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #f0f0f0; }
+    .list-item:last-child { border-bottom: none; }
+    .list-item-info strong { font-size: 1.05rem; }
+    .sub-text { font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem; }
+
+    /* --- Modal --- */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 1rem; }
+    .modal-content { background: white; padding: 2rem; border-radius: 8px; width: 95%; max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+    .modal-actions { margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem; }
+    .modal-body { margin-top: 1.5rem; }
+
+    /* --- Páginas de Login --- */
+    .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .login-card { width: 100%; max-width: 400px; text-align: center; }
+
+    /* --- Específicos --- */
+    .variantes-manager { border: 1px solid var(--cor-borda); border-radius: 6px; padding: 1rem; margin-top: 1.5rem; }
+    .variantes-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid var(--cor-borda); padding-bottom: 1rem; margin-bottom: 1rem; }
+    .variantes-tabs button { background-color: #f8f9fa; border: 1px solid var(--cor-borda); }
+    .variantes-tabs button.active { background-color: var(--cor-primaria); color: white; border-color: var(--cor-primaria); }
+
+    /* --- Layouts Responsivos --- */
+    .grid-responsive { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 2rem; }
+    @media (max-width: 992px) { .grid-responsive { grid-template-columns: 1fr; } }
+    @media (max-width: 768px) {
+        .main-header { flex-direction: column; gap: 0.75rem; padding: 1rem; }
+        .nav-button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+        .container { padding: 1rem; }
+        .card { padding: 1.25rem; }
+        .card h2 { font-size: 1.25rem; }
+        .form-group-inline { flex-direction: column; align-items: stretch; gap: 1rem; }
     }
+""")
+
+FIREBASE_JS_CONTENT = textwrap.dedent("""
+    import { initializeApp } from "firebase/app";
+    import { getFirestore } from "firebase/firestore";
+    import { getAuth } from "firebase/auth";
+    import { getAnalytics } from "firebase/analytics";
+
+    const firebaseConfig = {
+      // ATENÇÃO: Substitua pelas suas credenciais do Firebase
+      apiKey: "AIzaSyDrROaFFo6xjrkn4FhKWdY1c4Z0Jyy6SNw",
+      authDomain: "sistema-gestao-1a0cd.firebaseapp.com",
+      projectId: "sistema-gestao-1a0cd",
+      storageBucket: "sistema-gestao-1a0cd.appspot.com",
+      messagingSenderId: "715681926217",
+      appId: "1:715681926217:web:7b4ed090a6c2aa2afec398",
+      measurementId: "G-Z2KJC3GMNE"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const analytics = getAnalytics(app);
+
+    export { db, auth, analytics };
 """)
 
 APP_JS_CONTENT = textwrap.dedent("""
@@ -482,14 +361,11 @@ APP_JS_CONTENT = textwrap.dedent("""
     const AppContent = () => {
         const { user, userRole, logout } = useAuth();
         const { modal, closeModal, confirmationModal, handleConfirmAction, closeConfirmationModal } = useUI();
-        
         const [activeTab, setActiveTab] = useState('pedidos');
+
         useEffect(() => {
-            if (userRole === 'gestor') {
-                setActiveTab('dashboard');
-            } else {
-                setActiveTab('pedidos');
-            }
+            if (userRole === 'gestor') setActiveTab('dashboard');
+            else setActiveTab('pedidos');
         }, [userRole]);
 
         return (
@@ -503,20 +379,18 @@ APP_JS_CONTENT = textwrap.dedent("""
 
                 <header className="main-header">
                     <div className="user-info">Bem-vindo, {user.email} (<b>{userRole}</b>)</div>
-                    <button onClick={logout} className="button-primary">
+                    <button onClick={logout} className="button-primary" data-cy="btn-logout">
                         <IconeLogout /> Sair
                     </button>
                 </header>
-
                 <nav className="main-nav">
-                    {userRole === 'gestor' && <button className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><IconeDashboard /> Dashboard</button>}
-                    <button className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => setActiveTab('pedidos')}><IconeCarrinho /> Pedidos</button>
-                    <button className={`nav-button ${activeTab === 'cadastros' ? 'active' : ''}`} onClick={() => setActiveTab('cadastros')}><IconeCadastro /> Cadastros</button>
-                    {userRole === 'gestor' && <button className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => setActiveTab('cmv')}><IconeCmv /> CMV & Produtos</button>}
-                    {userRole === 'gestor' && <button className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`} onClick={() => setActiveTab('relatorios')}><IconeGrafico /> Relatórios</button>}
-                     <button className={`nav-button ${activeTab === 'historico' ? 'active' : ''}`} onClick={() => setActiveTab('historico')}><IconeHistorico /> Histórico</button>
+                    {userRole === 'gestor' && <button data-cy="nav-dashboard" className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><IconeDashboard /> Dashboard</button>}
+                    <button data-cy="nav-pedidos" className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => setActiveTab('pedidos')}><IconeCarrinho /> Pedidos</button>
+                    <button data-cy="nav-cadastros" className={`nav-button ${activeTab === 'cadastros' ? 'active' : ''}`} onClick={() => setActiveTab('cadastros')}><IconeCadastro /> Cadastros</button>
+                    {userRole === 'gestor' && <button data-cy="nav-cmv" className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => setActiveTab('cmv')}><IconeCmv /> CMV & Produtos</button>}
+                    {userRole === 'gestor' && <button data-cy="nav-relatorios" className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`} onClick={() => setActiveTab('relatorios')}><IconeGrafico /> Relatórios</button>}
+                    <button data-cy="nav-historico" className={`nav-button ${activeTab === 'historico' ? 'active' : ''}`} onClick={() => setActiveTab('historico')}><IconeHistorico /> Histórico</button>
                 </nav>
-
                 <main className="container">
                     {activeTab === 'dashboard' && userRole === 'gestor' && <DashboardView />}
                     {activeTab === 'pedidos' && <PedidosView />}
@@ -531,41 +405,11 @@ APP_JS_CONTENT = textwrap.dedent("""
 
     function App() {
         const { user, loadingAuth } = useAuth();
-        
-        if (loadingAuth) {
-            return <div className="loading-screen">Carregando...</div>;
-        }
-
+        if (loadingAuth) return <div className="loading-screen">Carregando...</div>;
         return user ? <AppContent /> : <AccessSelectionPage />;
     }
 
     export default App;
-""")
-
-FIREBASE_JS_CONTENT = textwrap.dedent("""
-    import { initializeApp } from "firebase/app";
-    import { getFirestore } from "firebase/firestore";
-    import { getAuth } from "firebase/auth";
-    import { getAnalytics } from "firebase/analytics";
-
-    // Your web app's Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyDrROaFFo6xjrkn4FhKWdY1c4Z0Jyy6SNw",
-      authDomain: "sistema-gestao-1a0cd.firebaseapp.com",
-      projectId: "sistema-gestao-1a0cd",
-      storageBucket: "sistema-gestao-1a0cd.firebasestorage.app",
-      messagingSenderId: "715681926217",
-      appId: "1:715681926217:web:7b4ed090a6c2aa2afec398",
-      measurementId: "G-Z2KJC3GMNE"
-    };
-
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    const analytics = getAnalytics(app);
-
-    export { db, auth, analytics };
 """)
 
 INDEX_JS_CONTENT = textwrap.dedent("""
@@ -591,6 +435,210 @@ INDEX_JS_CONTENT = textwrap.dedent("""
     );
 """)
 
+# CORREÇÃO DE FLUXO DE TESTE
+ACCESS_SELECTION_PAGE_JS_CONTENT = textwrap.dedent("""
+    import React, { useState } from 'react';
+    import { useAuth } from '../../context/AuthContext';
+    import { useUI } from '../../context/UIContext';
+    import { IconeCaminhao } from '../../utils/icons';
+
+    const AccessSelectionPage = () => {
+        const [view, setView] = useState('selection');
+        const [email, setEmail] = useState('');
+        const [password, setPassword] = useState('');
+        const { loginUser, registerUser } = useAuth();
+        const { showModal } = useUI();
+
+        const handleLogin = async (e) => {
+            e.preventDefault();
+            try {
+                await loginUser(email, password);
+            } catch (error) {
+                showModal("E-mail ou senha inválidos. Tente novamente.");
+            }
+        };
+
+        const handleRegister = async (e) => {
+            e.preventDefault();
+            try {
+                await registerUser(email, password, 'colaborador');
+                // O usuário será logado automaticamente pelo onAuthStateChanged
+                showModal("Cadastro realizado com sucesso!");
+            } catch (error) {
+                showModal(`Erro no cadastro: ${error.message}`);
+            }
+        };
+
+        const renderContent = () => {
+            switch (view) {
+                case 'login':
+                    return (
+                        <form onSubmit={handleLogin}>
+                            <h3>Acessar o Sistema</h3>
+                            <div className="form-group">
+                                <input data-cy="input-email-login" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
+                            </div>
+                            <div className="form-group">
+                                <input data-cy="input-senha-login" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" required />
+                            </div>
+                            <button data-cy="btn-login-submit" type="submit" className="button-primary" style={{width: '100%'}}>Entrar</button>
+                            <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
+                        </form>
+                    );
+                case 'register':
+                    return (
+                        <form onSubmit={handleRegister}>
+                            <h3>Registrar Novo Usuário</h3>
+                            <div className="form-group">
+                                <input data-cy="input-email-registro" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
+                            </div>
+                            <div className="form-group">
+                                <input data-cy="input-senha-registro" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mínimo 6 caracteres)" required />
+                            </div>
+                            <button data-cy="btn-register-submit" type="submit" className="button-primary" style={{width: '100%'}}>Registrar</button>
+                            <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
+                        </form>
+                    );
+                default:
+                    return (
+                        <>
+                            <p className="login-subtitle">Bem-vindo!</p>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                                <button data-cy="btn-show-login" onClick={() => setView('login')} className="button-primary large">Entrar</button>
+                                <button data-cy="btn-show-register" onClick={() => setView('register')} className="button-secondary large">Registrar Novo Colaborador</button>
+                            </div>
+                        </>
+                    );
+            }
+        };
+
+        return (
+            <div className="login-container">
+                <div className="login-card card">
+                    <h1 className="login-title"><IconeCaminhao /> Sistema de Pedidos</h1>
+                    {renderContent()}
+                </div>
+            </div>
+        );
+    };
+    
+    export default AccessSelectionPage;
+""")
+
+GERENCIAR_FORNECEDORES_JS_CONTENT = textwrap.dedent("""
+    import React, { useState, useMemo } from 'react';
+    import { useUI } from '../../context/UIContext';
+    import { useData } from '../../context/DataContext';
+    import { addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
+    import { IconeCaminhao, IconeBusca, IconeEditar, IconeLixeira } from '../../utils/icons';
+    import { formatarWhatsappParaLink, formatarWhatsappParaExibicao } from '../../utils/formatters';
+
+    const GerenciarFornecedores = () => {
+        const { showModal, showConfirmationModal } = useUI();
+        const { fornecedores } = useData();
+        const [editingFornecedor, setEditingFornecedor] = useState(null);
+        const [nome, setNome] = useState('');
+        const [whatsapp, setWhatsapp] = useState('');
+        const [observacoes, setObservacoes] = useState('');
+        const [busca, setBusca] = useState('');
+
+        const fornecedoresFiltrados = useMemo(() =>
+            fornecedores.filter(f => f.nome.toLowerCase().includes(busca.toLowerCase())),
+            [fornecedores, busca]
+        );
+
+        const handleSalvar = async (e) => {
+            e.preventDefault();
+            const numeroFormatado = formatarWhatsappParaLink(whatsapp);
+            if (!nome || !numeroFormatado) {
+                showModal('Preencha o nome e um WhatsApp válido.');
+                return;
+            }
+            const data = { nome, whatsapp: numeroFormatado, observacoes: observacoes || null };
+            try {
+                if (editingFornecedor) {
+                    await updateDocument("fornecedores", editingFornecedor.id, data);
+                    showModal('Fornecedor atualizado!');
+                } else {
+                    await addDocument("fornecedores", data);
+                    showModal('Fornecedor salvo!');
+                }
+                resetForm();
+            } catch (error) {
+                showModal('Erro ao salvar: ' + error.message);
+            }
+        };
+
+        const handleEditar = (fornecedor) => {
+            setEditingFornecedor(fornecedor); setNome(fornecedor.nome);
+            setWhatsapp(fornecedor.whatsapp); setObservacoes(fornecedor.observacoes || '');
+        };
+
+        const handleDelete = (id) => {
+            showConfirmationModal("Excluir este fornecedor?", async () => {
+                try {
+                    await deleteDocument("fornecedores", id);
+                    showModal("Fornecedor excluído.");
+                } catch (error) {
+                    showModal("Erro ao excluir: " + error.message);
+                }
+            });
+        };
+
+        const resetForm = () => {
+            setEditingFornecedor(null); setNome('');
+            setWhatsapp(''); setObservacoes('');
+        };
+
+        return (
+            <div className="card" data-cy="card-gerenciar-fornecedores">
+                <h2><IconeCaminhao /> Gerenciar Fornecedores</h2>
+                <form onSubmit={handleSalvar}>
+                    <div className="form-group">
+                        <label>Nome</label>
+                        <input data-cy="input-fornecedor-nome" type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da empresa" required />
+                    </div>
+                    <div className="form-group">
+                        <label>WhatsApp</label>
+                        <input data-cy="input-fornecedor-whatsapp" type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required />
+                    </div>
+                    <div className="form-group">
+                        <label>Observações</label>
+                        <input data-cy="input-fornecedor-obs" type="text" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Ex: Entregas às terças" />
+                    </div>
+                    <button data-cy="btn-adicionar-fornecedor" type="submit" className="button-primary">{editingFornecedor ? 'Atualizar Fornecedor' : 'Adicionar Fornecedor'}</button>
+                    {editingFornecedor && <button type="button" onClick={resetForm} className="button-link">Cancelar Edição</button>}
+                </form>
+                <div className="divider" />
+                <div className="form-group">
+                    <label>Buscar Fornecedor</label>
+                    <div className="input-with-icon">
+                      <span className="icon"><IconeBusca /></span>
+                      <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." />
+                    </div>
+                </div>
+                <div className="list-container">
+                    {fornecedoresFiltrados.map(f => (
+                        <div key={f.id} className="list-item">
+                            <div className="list-item-info">
+                                <p><strong>{f.nome}</strong></p>
+                                <a href={`https://wa.me/${f.whatsapp}`} target="_blank" rel="noopener noreferrer">{formatarWhatsappParaExibicao(f.whatsapp)}</a>
+                                {f.observacoes && <p className='sub-text'>Obs: {f.observacoes}</p>}
+                            </div>
+                            <div className="list-item-actions">
+                                <button className="button-icon" onClick={() => handleEditar(f)}><IconeEditar /></button>
+                                <button className="button-icon" onClick={() => handleDelete(f.id)}><IconeLixeira /></button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    export default GerenciarFornecedores;
+""")
+
 AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
     import React, { createContext, useState, useEffect, useContext } from 'react';
     import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
@@ -606,17 +654,12 @@ AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
 
         useEffect(() => {
             const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                setLoadingAuth(true);
                 if (currentUser) {
                     setUser(currentUser);
                     const userDocRef = doc(db, "users", currentUser.uid);
                     const userDocSnap = await getDoc(userDocRef);
                     if (userDocSnap.exists()) {
                         setUserRole(userDocSnap.data().role);
-                    } else {
-                        // Se o documento não existe, pode ser um novo usuário
-                        // A role será definida durante o cadastro
-                        setUserRole(null);
                     }
                 } else {
                     setUser(null);
@@ -632,7 +675,6 @@ AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
         const registerUser = async (email, password, role = 'colaborador') => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
-            // Cria um documento para o usuário com sua role
             await setDoc(doc(db, "users", user.uid), {
                 uid: user.uid,
                 email: user.email,
@@ -671,14 +713,12 @@ DATA_CONTEXT_JS_CONTENT = textwrap.dedent("""
 
         useEffect(() => {
             if (!user) {
-                setFornecedores([]);
-                setProdutosDeCompra([]);
-                setInsumos([]);
-                setProdutos([]);
-                setAllPedidos([]);
+                setFornecedores([]); setProdutosDeCompra([]); setInsumos([]);
+                setProdutos([]); setAllPedidos([]); setLoadingData(false);
                 return;
             }
 
+            setLoadingData(true);
             const collectionsToFetch = [
                 { name: "fornecedores", setter: setFornecedores, orderByField: "nome" },
                 { name: "produtosDeCompra", setter: setProdutosDeCompra, orderByField: "nome" },
@@ -690,29 +730,20 @@ DATA_CONTEXT_JS_CONTENT = textwrap.dedent("""
                 collectionsToFetch.push({ name: "produtosFinais", setter: setProdutos, orderByField: "nome" });
             }
             
-            setLoadingData(true);
-            const unsubscribers = collectionsToFetch.map(coll => {
-                const q = query(collection(db, coll.name), orderBy(coll.orderByField, coll.orderDirection || 'asc'));
-                return onSnapshot(q, 
-                    (snapshot) => {
-                        const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                        coll.setter(data);
-                    },
-                    (error) => {
-                        console.error("Erro ao buscar coleção: ", coll.name, error);
-                    }
-                );
-            });
+            const unsubscribers = collectionsToFetch.map(coll => 
+                onSnapshot(query(collection(db, coll.name), orderBy(coll.orderByField, coll.orderDirection || 'asc')), 
+                    (snapshot) => coll.setter(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))),
+                    (error) => console.error("Erro ao buscar coleção:", coll.name, error)
+                )
+            );
+            
             setLoadingData(false);
-
             return () => unsubscribers.forEach(unsub => unsub());
         }, [user, userRole]);
 
         const value = { fornecedores, produtosDeCompra, insumos, produtos, allPedidos, loadingData };
-
         return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
     };
-
     export const useData = () => useContext(DataContext);
 """)
 
@@ -754,109 +785,20 @@ MODAL_JS_CONTENT = textwrap.dedent("""
 
     const Modal = ({ children, onConfirm, showCancel, onCancel, title, confirmText = "Fechar" }) => (
         <div className="modal-overlay">
-            <div className="modal-content large">
+            <div className="modal-content">
                 {title && <h2>{title}</h2>}
                 <div className="modal-body">
                     {typeof children === 'string' ? <p>{children}</p> : children}
                 </div>
                 <div className="modal-actions">
                     {showCancel && <button onClick={onCancel} className="button-secondary">Cancelar</button>}
-                    <button onClick={onConfirm} className="button-primary">{confirmText}</button>
+                    <button data-cy="modal-confirm-button" onClick={onConfirm} className="button-primary">{confirmText}</button>
                 </div>
             </div>
         </div>
     );
 
     export default Modal;
-""")
-
-ACCESS_SELECTION_PAGE_JS_CONTENT = textwrap.dedent("""
-    import React, { useState } from 'react';
-    import { useAuth } from '../../context/AuthContext';
-    import { useUI } from '../../context/UIContext';
-    import { IconeCaminhao } from '../../utils/icons';
-
-    const AccessSelectionPage = () => {
-        const [view, setView] = useState('selection'); // 'selection', 'login', 'register'
-        const [email, setEmail] = useState('');
-        const [password, setPassword] = useState('');
-        const { loginUser, registerUser } = useAuth();
-        const { showModal } = useUI();
-
-        const handleLogin = async (e) => {
-            e.preventDefault();
-            try {
-                await loginUser(email, password);
-            } catch (error) {
-                showModal("E-mail ou senha inválidos. Tente novamente.");
-            }
-        };
-
-        const handleRegister = async (e) => {
-            e.preventDefault();
-            try {
-                await registerUser(email, password, 'colaborador');
-                showModal("Cadastro realizado com sucesso! Você já pode fazer o login.");
-                setView('login'); // Leva para a tela de login após o cadastro
-            } catch (error) {
-                showModal(`Erro no cadastro: ${error.message}`);
-            }
-        };
-
-        const renderContent = () => {
-            switch (view) {
-                case 'login':
-                    return (
-                        <form onSubmit={handleLogin}>
-                            <h3>Acessar o Sistema</h3>
-                            <div className="form-group">
-                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
-                            </div>
-                            <div className="form-group">
-                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" required />
-                            </div>
-                            <button type="submit" className="button-primary" style={{width: '100%'}}>Entrar</button>
-                            <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
-                        </form>
-                    );
-                case 'register':
-                    return (
-                        <form onSubmit={handleRegister}>
-                            <h3>Registrar Novo Usuário</h3>
-                            <div className="form-group">
-                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
-                            </div>
-                            <div className="form-group">
-                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mínimo 6 caracteres)" required />
-                            </div>
-                            <button type="submit" className="button-primary" style={{width: '100%'}}>Registrar</button>
-                            <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
-                        </form>
-                    );
-                default: // selection
-                    return (
-                        <>
-                            <p className="login-subtitle">Bem-vindo!</p>
-                            <div className="access-selection" style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                                <button onClick={() => setView('login')} className="button-primary large">Entrar</button>
-                                <button onClick={() => setView('register')} className="button-secondary large">Registrar Novo Colaborador</button>
-                            </div>
-                        </>
-                    );
-            }
-        };
-
-        return (
-            <div className="login-container">
-                <div className="login-card card">
-                    <h1 className="login-title"><IconeCaminhao /> Sistema de Pedidos</h1>
-                    {renderContent()}
-                </div>
-            </div>
-        );
-    };
-    
-    export default AccessSelectionPage;
 """)
 
 DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
@@ -876,7 +818,6 @@ DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
                 return { barChartData: null, lineChartData: null };
             }
 
-            // --- Gráfico de Barras: Gastos por Fornecedor ---
             const gastosPorFornecedor = allPedidos.reduce((acc, pedido) => {
                 if(pedido.status === 'finalizado') {
                     const nome = pedido.fornecedorNome || 'Sem Fornecedor';
@@ -891,11 +832,10 @@ DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
                 datasets: [{
                     label: 'Gastos Totais por Fornecedor (R$)',
                     data: Object.values(gastosPorFornecedor),
-                    backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                    backgroundColor: 'rgba(0, 51, 160, 0.6)',
                 }],
             };
             
-            // --- Gráfico de Linha: Gastos Mensais ---
             const gastosPorMes = allPedidos.reduce((acc, pedido) => {
                 if (pedido.status === 'finalizado' && pedido.criadoEm) {
                     const mesAno = new Date(pedido.criadoEm.seconds * 1000).toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit' });
@@ -917,7 +857,7 @@ DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
                     label: 'Gastos Mensais (R$)',
                     data: sortedMonths.map(mes => gastosPorMes[mes]),
                     fill: false,
-                    borderColor: 'rgb(220, 53, 69)',
+                    borderColor: 'rgb(217, 48, 37)',
                     tension: 0.1
                 }]
             };
@@ -959,20 +899,15 @@ DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
 """)
 
 CADASTROS_VIEW_JS_CONTENT = textwrap.dedent("""
-    import React from 'react';
-    import GerenciarFornecedores from './GerenciarFornecedores';
+    import React from 'react'; 
+    import GerenciarFornecedores from './GerenciarFornecedores'; 
     import GerenciarCatalogo from './GerenciarCatalogo';
-
-    const CadastrosView = () => {
-        return (
-            <div className="grid-responsive">
-                <GerenciarFornecedores />
-                <GerenciarCatalogo />
-            </div>
-        );
-    };
-
-    export default CadastrosView;
+    export default () => (
+        <div className='grid-responsive'>
+            <GerenciarFornecedores />
+            <GerenciarCatalogo />
+        </div>
+    );
 """)
 
 GERENCIAR_CATALOGO_JS_CONTENT = textwrap.dedent("""
@@ -1003,7 +938,7 @@ GERENCIAR_CATALOGO_JS_CONTENT = textwrap.dedent("""
 
         const produtosFiltrados = useMemo(() =>
             produtosDeCompra.filter(p => p.nome.toLowerCase().includes(busca.toLowerCase())),
-          [produtosDeCompra, busca]
+            [produtosDeCompra, busca]
         );
 
         const handleFormChange = (e) => {
@@ -1011,7 +946,7 @@ GERENCIAR_CATALOGO_JS_CONTENT = textwrap.dedent("""
             if (name.startsWith("detalheCompra.")) {
                 const field = name.split('.')[1];
                 if (field === 'tipoBase') {
-                    const newUnit = value === 'peso' ? 'kg' : 'ml';
+                    const newUnit = value === 'peso' ? 'kg' : 'L';
                     setFormState(prev => ({...prev, detalheCompra: {...prev.detalheCompra, tipoBase: value, unidadeConteudo: newUnit}}));
                 } else {
                     setFormState(prev => ({...prev, detalheCompra: {...prev.detalheCompra, [field]: value}}));
@@ -1103,7 +1038,7 @@ GERENCIAR_CATALOGO_JS_CONTENT = textwrap.dedent("""
                     {editing && <button type="button" onClick={resetForm} className="button-link">Cancelar</button>}
                 </form>
                 <div className="divider" />
-                <div className="form-group"><label>Buscar Produto</label><div className="input-with-icon"><IconeBusca /><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
+                <div className="form-group"><label>Buscar Produto</label><div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
                 <div className="list-container">
                     {produtosFiltrados.map(p => (
                         <div key={p.id} className="list-item">
@@ -1126,119 +1061,14 @@ GERENCIAR_CATALOGO_JS_CONTENT = textwrap.dedent("""
     export default GerenciarCatalogo;
 """)
 
-GERENCIAR_FORNECEDORES_JS_CONTENT = textwrap.dedent("""
-    import React, { useState, useMemo } from 'react';
-    import { useUI } from '../../context/UIContext';
-    import { useData } from '../../context/DataContext';
-    import { addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
-    import { IconeCaminhao, IconeBusca, IconeEditar, IconeLixeira } from '../../utils/icons';
-    import { formatarWhatsappParaLink, formatarWhatsappParaExibicao } from '../../utils/formatters';
-
-    const GerenciarFornecedores = () => {
-        const { showModal, showConfirmationModal } = useUI();
-        const { fornecedores } = useData();
-        const [editingFornecedor, setEditingFornecedor] = useState(null);
-        const [nome, setNome] = useState('');
-        const [whatsapp, setWhatsapp] = useState('');
-        const [observacoes, setObservacoes] = useState('');
-        const [busca, setBusca] = useState('');
-
-        const fornecedoresFiltrados = useMemo(() =>
-            fornecedores.filter(f => f.nome.toLowerCase().includes(busca.toLowerCase())),
-            [fornecedores, busca]
-        );
-
-        const handleSalvar = async (e) => {
-            e.preventDefault();
-            const numeroFormatado = formatarWhatsappParaLink(whatsapp);
-            if (!nome || !numeroFormatado) {
-                showModal('Preencha o nome e um WhatsApp válido.');
-                return;
-            }
-            const data = { nome, whatsapp: numeroFormatado, observacoes: observacoes || null };
-
-            try {
-                if (editingFornecedor) {
-                    await updateDocument("fornecedores", editingFornecedor.id, data);
-                    showModal('Fornecedor atualizado!');
-                } else {
-                    await addDocument("fornecedores", data);
-                    showModal('Fornecedor salvo!');
-                }
-                resetForm();
-            } catch (error) {
-                showModal('Erro ao salvar: ' + error.message);
-            }
-        };
-
-        const handleEditar = (fornecedor) => {
-            setEditingFornecedor(fornecedor);
-            setNome(fornecedor.nome);
-            setWhatsapp(fornecedor.whatsapp);
-            setObservacoes(fornecedor.observacoes || '');
-        };
-
-        const handleDelete = (id) => {
-            showConfirmationModal("Excluir este fornecedor?", async () => {
-                try {
-                    await deleteDocument("fornecedores", id);
-                    showModal("Fornecedor excluído.");
-                } catch (error) {
-                    showModal("Erro ao excluir: " + error.message);
-                }
-            });
-        };
-
-        const resetForm = () => {
-            setEditingFornecedor(null);
-            setNome('');
-            setWhatsapp('');
-            setObservacoes('');
-        };
-
-        return (
-            <div className="card">
-                <h2><IconeCaminhao /> Gerenciar Fornecedores</h2>
-                <form onSubmit={handleSalvar}>
-                    <div className="form-group"><label>Nome</label><input type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da empresa" required /></div>
-                    <div className="form-group"><label>WhatsApp</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required /></div>
-                    <div className="form-group"><label>Observações</label><input type="text" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Ex: Entregas às terças" /></div>
-                    <button type="submit" className="button-primary">{editingFornecedor ? 'Atualizar Fornecedor' : 'Adicionar Fornecedor'}</button>
-                    {editingFornecedor && <button type="button" onClick={resetForm} className="button-link">Cancelar Edição</button>}
-                </form>
-                <div className="divider" />
-                <div className="form-group"><label>Buscar Fornecedor</label><div className="input-with-icon"><IconeBusca /><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
-                <div className="list-container">
-                    {fornecedoresFiltrados.map(f => (
-                        <div key={f.id} className="list-item">
-                            <div className="list-item-info">
-                                <p><strong>{f.nome}</strong></p>
-                                <a href={`https://wa.me/${f.whatsapp}`} target="_blank" rel="noopener noreferrer">{formatarWhatsappParaExibicao(f.whatsapp)}</a>
-                                {f.observacoes && <p className='sub-text'>Obs: {f.observacoes}</p>}
-                            </div>
-                            <div className="list-item-actions">
-                                <button className="button-icon" onClick={() => handleEditar(f)}><IconeEditar /></button>
-                                <button className="button-icon" onClick={() => handleDelete(f.id)}><IconeLixeira /></button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
-    export default GerenciarFornecedores;
-""")
-
 CMV_VIEW_JS_CONTENT = textwrap.dedent("""
     import React, { useState, useMemo } from 'react';
     import { useData } from '../../context/DataContext';
     import { useUI } from '../../context/UIContext';
     import { setDocument, incrementField, addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
-    import { IconeCmv, IconePizza, IconeEditar, IconeLixeira, IconeSalvar } from '../../utils/icons';
+    import { IconeCmv, IconeFichaTecnica, IconeEditar, IconeLixeira, IconeSalvar } from '../../utils/icons';
     import { formatarValor, formatarValorPreciso } from '../../utils/formatters';
     
-    // --- Sub-componente para Registrar Compra ---
     const RegistrarCompra = () => {
         const { produtosDeCompra, allPedidos } = useData();
         const { showModal } = useUI();
@@ -1327,8 +1157,7 @@ CMV_VIEW_JS_CONTENT = textwrap.dedent("""
             </div>
         );
     };
-
-    // --- Sub-componente para Gerenciar Produtos Finais (Ficha Técnica) ---
+ 
     const GerenciarProdutosFinais = () => {
         const { insumos, produtos } = useData();
         const { showModal, showConfirmationModal } = useUI();
@@ -1465,7 +1294,7 @@ CMV_VIEW_JS_CONTENT = textwrap.dedent("""
 
         return (
             <div className="card">
-                <h2><IconePizza /> Gerenciar Produtos Finais (Ficha Técnica)</h2>
+                <h2><IconeFichaTecnica /> Gerenciar Produtos Finais (Ficha Técnica)</h2>
                 <form onSubmit={handleSalvarProdutoFinal}>
                     <div className="form-group-inline">
                         <div className="form-group"><label>Nome do Produto</label><input type="text" value={formState.nome} onChange={e => setFormState({...formState, nome: e.target.value})} placeholder="Ex: Pizza" required/></div>
@@ -1511,7 +1340,7 @@ CMV_VIEW_JS_CONTENT = textwrap.dedent("""
                 </form>
 
                 <div className="divider" />
-                <h3><IconePizza /> Produtos Finais Cadastrados</h3>
+                <h3><IconeFichaTecnica /> Produtos Finais Cadastrados</h3>
                 <div className="form-group"><label>Margem de Lucro para Preço Sugerido (%)</label><input type="number" value={margemLucro} onChange={e => setMargemLucro(Number(e.target.value))} /></div>
                 <div className="list-container">
                     {produtos.map(p => (
@@ -1539,8 +1368,7 @@ CMV_VIEW_JS_CONTENT = textwrap.dedent("""
             </div>
         );
     };
-
-    // --- Componente Principal da View ---
+    
     const CmvView = () => {
         return (
             <div className="grid-responsive">
@@ -1649,9 +1477,9 @@ PEDIDOS_VIEW_JS_CONTENT = textwrap.dedent("""
                     fornecedorId: fornecedor.id,
                     fornecedorNome: fornecedor.nome,
                     itens: itensDoPedido,
-                    solicitanteEmail: user.isAnonymous ? 'Colaborador Anônimo' : user.email,
+                    solicitanteEmail: user.email,
                     status: 'enviado',
-                    valorTotal: 0 // Valor inicial
+                    valorTotal: 0
                 });
             } catch (error) {
                 showModal("Erro ao salvar pedido no histórico: " + error.message);
@@ -1707,7 +1535,7 @@ PEDIDOS_VIEW_JS_CONTENT = textwrap.dedent("""
                             <div key={fornecedorId} className="pedido-fornecedor">
                                 <h4>Pedido para: {fornecedor?.nome || '...'}</h4>
                                 {carrinho[fornecedorId].map((item, index) => (
-                                    <div key={index} className="pedido-item">
+                                    <div key={index} className="list-item">
                                         <span>{item.qtd}x {item.nome} {item.observacao && <em className="sub-text">({item.observacao})</em>}</span>
                                         <button className="button-icon" onClick={() => {
                                             const novoCarrinho = { ...carrinho };
@@ -1791,7 +1619,7 @@ ANALISE_CUSTO_INSUMO_JS_CONTENT = textwrap.dedent("""
                 datasets: [{
                     label: `Custo por ${insumoSelecionado[0].unidade_padrao}`,
                     data,
-                    backgroundColor: 'rgba(220, 53, 69, 0.6)',
+                    backgroundColor: 'rgba(217, 48, 37, 0.6)',
                 }]
             }
         }, [insumoSelecionado, fornecedores]);
@@ -1841,62 +1669,43 @@ FIRESTORE_SERVICE_JS_CONTENT = textwrap.dedent("""
     import { collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc, increment } from "firebase/firestore";
 
     export const addDocument = (collectionName, data) => {
-        return addDoc(collection(db, collectionName), {
-            ...data,
-            criadoEm: serverTimestamp()
-        });
+        return addDoc(collection(db, collectionName), { ...data, criadoEm: serverTimestamp() });
     };
-
     export const updateDocument = (collectionName, docId, data) => {
         const docRef = doc(db, collectionName, docId);
-        return updateDoc(docRef, {
-            ...data,
-            atualizadoEm: serverTimestamp()
-        });
+        return updateDoc(docRef, { ...data, atualizadoEm: serverTimestamp() });
     };
-
     export const deleteDocument = (collectionName, docId) => {
         const docRef = doc(db, collectionName, docId);
         return deleteDoc(docRef);
     };
-
     export const setDocument = (collectionName, docId, data) => {
         const docRef = doc(db, collectionName, docId);
-        // Use merge:true para criar se não existe, ou atualizar campos sem sobrescrever o documento inteiro.
-        // Essencial para manter o 'criadoEm' ao atualizar.
-        return setDoc(docRef, {
-            ...data,
-            atualizadoEm: serverTimestamp()
-        }, { merge: true }); 
+        return setDoc(docRef, { ...data, atualizadoEm: serverTimestamp() }, { merge: true }); 
     };
-
     export const incrementField = (collectionName, docId, field, value) => {
         const docRef = doc(db, collectionName, docId);
-        return updateDoc(docRef, {
-            [field]: increment(value)
-        });
+        return updateDoc(docRef, { [field]: increment(value) });
     };
 """)
 
 ICONS_JS_CONTENT = textwrap.dedent("""
     import React from 'react';
-
-    const Icon = ({ children }) => <span className="icon">{children}</span>;
-
-    export const IconeCaminhao = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM8 9h2m5-3v10l-2 2h-1" /></svg></Icon>;
-    export const IconeCadastro = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></Icon>;
-    export const IconeCarrinho = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c.51 0 .962-.343 1.087-.835l1.838-5.513c.279-.834-.26-1.745-1.132-1.745H4.883L3.117 3.187m15.75 11.25a3 3 0 00-3-3H7.5" /></svg></Icon>;
-    export const IconeLixeira = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></Icon>;
-    export const IconeEditar = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg></Icon>;
-    export const IconeLogout = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg></Icon>;
-    export const IconeCmv = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg></Icon>;
-    export const IconeHistorico = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg></Icon>;
-    export const IconeGrafico = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h16.5v11.25A2.25 2.25 0 0118 16.5h-12A2.25 2.25 0 013.75 14.25V3z" /></svg></Icon>;
-    export const IconeBusca = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></Icon>;
-    export const IconeCatalogo = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg></Icon>;
-    export const IconeDashboard = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg></Icon>;
-    export const IconePizza = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.721 1.05A48.353 48.353 0 0112 1.5c4.142 0 8.086.673 11.279 1.833m-14.058 0c-1.12 0-2.14.28-3 .75l-4.5 2.25a2.983 2.983 0 00-1.5 2.6V12c0 1.258.53 2.404 1.41 3.235l2.29 2.09a2.99 2.99 0 004.218 0l.282-.257m-4.218-5.584a1.875 1.875 0 012.652 0l4.242 4.242a1.875 1.875 0 010 2.652l-4.242 4.242a1.875 1.875 0 01-2.652 0l-2.29-2.09a2.99 2.99 0 010-4.218l.257-.282z" /></svg></Icon>;
-    export const IconeSalvar = () => <Icon><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75l3 3m0 0l3-3m-3 3v-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></Icon>;
+    const Icon = ({ children, ...props }) => <span className="icon" {...props}>{children}</span>;
+    export const IconeCaminhao = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM8 9h2m5-3v10l-2 2h-1" /></svg></Icon>;
+    export const IconeCadastro = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></Icon>;
+    export const IconeCarrinho = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c.51 0 .962-.343 1.087-.835l1.838-5.513c.279-.834-.26-1.745-1.132-1.745H4.883L3.117 3.187m15.75 11.25a3 3 0 00-3-3H7.5" /></svg></Icon>;
+    export const IconeLixeira = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></Icon>;
+    export const IconeEditar = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg></Icon>;
+    export const IconeLogout = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg></Icon>;
+    export const IconeCmv = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg></Icon>;
+    export const IconeHistorico = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg></Icon>;
+    export const IconeGrafico = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h16.5v11.25A2.25 2.25 0 0118 16.5h-12A2.25 2.25 0 013.75 14.25V3z" /></svg></Icon>;
+    export const IconeBusca = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></Icon>;
+    export const IconeCatalogo = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg></Icon>;
+    export const IconeDashboard = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg></Icon>;
+    export const IconeFichaTecnica = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></Icon>;
+    export const IconeSalvar = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75l3 3m0 0l3-3m-3 3v-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></Icon>;
 """)
 
 FORMATTERS_JS_CONTENT = textwrap.dedent("""
@@ -1941,15 +1750,20 @@ FORMATTERS_JS_CONTENT = textwrap.dedent("""
     };
 """)
 
-# --- Estrutura de Diretórios e Arquivos ---
+# --- ESTRUTURA FINAL DO PROJETO ---
+
 PROJECT_STRUCTURE = {
     "sistema-pedidos-100": {
         "package.json": PACKAGE_JSON_CONTENT,
         ".gitignore": GITIGNORE_CONTENT,
         "README.md": README_MD_CONTENT,
-        "public": {
-            "index.html": INDEX_HTML_CONTENT
+        "cypress.config.js": CYPRESS_CONFIG_JS_CONTENT,
+        "cypress": {
+            "e2e": {
+                "sistema_completo.cy.js": CYPRESS_TEST_FILE_CONTENT
+            }
         },
+        "public": { "index.html": INDEX_HTML_CONTENT },
         "src": {
             "App.css": APP_CSS_CONTENT,
             "App.js": APP_JS_CONTENT,
@@ -1957,13 +1771,8 @@ PROJECT_STRUCTURE = {
             "index.css": INDEX_CSS_CONTENT,
             "index.js": INDEX_JS_CONTENT,
             "components": {
-                "auth": {
-                    "AccessSelectionPage.js": ACCESS_SELECTION_PAGE_JS_CONTENT,
-                    # Removido: "GestorLoginPage.js": GESTOR_LOGIN_PAGE_JS_CONTENT,
-                },
-                "ui": {
-                    "Modal.js": MODAL_JS_CONTENT
-                }
+                "auth": { "AccessSelectionPage.js": ACCESS_SELECTION_PAGE_JS_CONTENT },
+                "ui": { "Modal.js": MODAL_JS_CONTENT }
             },
             "context": {
                 "AuthContext.js": AUTH_CONTEXT_JS_CONTENT,
@@ -1971,31 +1780,21 @@ PROJECT_STRUCTURE = {
                 "UIContext.js": UI_CONTEXT_JS_CONTENT,
             },
             "features": {
-                "dashboard": {
-                    "DashboardView.js": DASHBOARD_VIEW_JS_CONTENT
-                },
+                "dashboard": { "DashboardView.js": DASHBOARD_VIEW_JS_CONTENT },
                 "cadastros": {
                     "CadastrosView.js": CADASTROS_VIEW_JS_CONTENT,
                     "GerenciarCatalogo.js": GERENCIAR_CATALOGO_JS_CONTENT,
                     "GerenciarFornecedores.js": GERENCIAR_FORNECEDORES_JS_CONTENT,
                 },
-                "cmv": {
-                    "CmvView.js": CMV_VIEW_JS_CONTENT
-                },
-                "historico": {
-                    "HistoricoView.js": HISTORICO_VIEW_JS_CONTENT
-                },
-                "pedidos": {
-                    "PedidosView.js": PEDIDOS_VIEW_JS_CONTENT
-                },
+                "cmv": { "CmvView.js": CMV_VIEW_JS_CONTENT },
+                "historico": { "HistoricoView.js": HISTORICO_VIEW_JS_CONTENT },
+                "pedidos": { "PedidosView.js": PEDIDOS_VIEW_JS_CONTENT },
                 "relatorios": {
                     "RelatoriosView.js": RELATORIOS_VIEW_JS_CONTENT,
                     "AnaliseDeCustoInsumo.js": ANALISE_CUSTO_INSUMO_JS_CONTENT
                 }
             },
-            "services": {
-                "firestoreService.js": FIRESTORE_SERVICE_JS_CONTENT,
-            },
+            "services": { "firestoreService.js": FIRESTORE_SERVICE_JS_CONTENT },
             "utils": {
                 "formatters.js": FORMATTERS_JS_CONTENT,
                 "icons.js": ICONS_JS_CONTENT
@@ -2006,9 +1805,6 @@ PROJECT_STRUCTURE = {
 
 
 def create_project_structure(base_path, structure):
-    """
-    Função recursiva para criar diretórios e arquivos.
-    """
     for name, content in structure.items():
         current_path = os.path.join(base_path, name)
         if isinstance(content, dict):
@@ -2020,29 +1816,24 @@ def create_project_structure(base_path, structure):
             with open(current_path, 'w', encoding='utf-8') as f:
                 f.write(content.strip())
 
-
 def main():
-    """
-    Função principal que inicia a criação do projeto.
-    """
-    print("Iniciando a criação da estrutura do projeto React...")
-    
+    print("Iniciando a criação da estrutura do projeto React e dos testes Cypress...")
     project_root = os.getcwd()
-    
     create_project_structure(project_root, PROJECT_STRUCTURE)
 
-    print("\n" + "="*50)
-    print("✅ Estrutura do projeto criada com sucesso!")
+    print("\\n" + "="*50)
+    print("✅ Estrutura do projeto corrigida e criada com sucesso!")
     print("="*50)
-    print("\nPróximos passos:")
+    print("\\nPróximos passos:")
     print("1. Navegue até a pasta do projeto:")
-    print(f"   cd sistema-pedidos-100")
-    print("\n2. Instale as dependências (requer Node.js e npm):")
+    print("   cd sistema-pedidos-100")
+    print("\\n2. Instale as dependências (requer Node.js e npm):")
     print("   npm install")
-    print("\n3. Inicie o servidor de desenvolvimento:")
+    print("\\n3. Inicie o servidor de desenvolvimento:")
     print("   npm start")
-    print("\nLembre-se: Para segurança, configure as Regras do Firestore no seu console do Firebase!")
-
+    print("\\n4. Em um novo terminal, execute o comando para abrir o Cypress:")
+    print("   npm run cypress:open")
+    print("\\nLembre-se: Configure suas credenciais em 'src/firebase.js'!")
 
 if __name__ == "__main__":
     main()

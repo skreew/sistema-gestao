@@ -25,7 +25,7 @@ const GerenciarCatalogo = () => {
 
     const produtosFiltrados = useMemo(() =>
         produtosDeCompra.filter(p => p.nome.toLowerCase().includes(busca.toLowerCase())),
-      [produtosDeCompra, busca]
+        [produtosDeCompra, busca]
     );
 
     const handleFormChange = (e) => {
@@ -33,7 +33,7 @@ const GerenciarCatalogo = () => {
         if (name.startsWith("detalheCompra.")) {
             const field = name.split('.')[1];
             if (field === 'tipoBase') {
-                const newUnit = value === 'peso' ? 'kg' : 'ml';
+                const newUnit = value === 'peso' ? 'kg' : 'L';
                 setFormState(prev => ({...prev, detalheCompra: {...prev.detalheCompra, tipoBase: value, unidadeConteudo: newUnit}}));
             } else {
                 setFormState(prev => ({...prev, detalheCompra: {...prev.detalheCompra, [field]: value}}));
@@ -125,7 +125,7 @@ const GerenciarCatalogo = () => {
                 {editing && <button type="button" onClick={resetForm} className="button-link">Cancelar</button>}
             </form>
             <div className="divider" />
-            <div className="form-group"><label>Buscar Produto</label><div className="input-with-icon"><IconeBusca /><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
+            <div className="form-group"><label>Buscar Produto</label><div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
             <div className="list-container">
                 {produtosFiltrados.map(p => (
                     <div key={p.id} className="list-item">

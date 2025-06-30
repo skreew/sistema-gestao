@@ -27,7 +27,6 @@ const GerenciarFornecedores = () => {
             return;
         }
         const data = { nome, whatsapp: numeroFormatado, observacoes: observacoes || null };
-
         try {
             if (editingFornecedor) {
                 await updateDocument("fornecedores", editingFornecedor.id, data);
@@ -43,10 +42,8 @@ const GerenciarFornecedores = () => {
     };
 
     const handleEditar = (fornecedor) => {
-        setEditingFornecedor(fornecedor);
-        setNome(fornecedor.nome);
-        setWhatsapp(fornecedor.whatsapp);
-        setObservacoes(fornecedor.observacoes || '');
+        setEditingFornecedor(fornecedor); setNome(fornecedor.nome);
+        setWhatsapp(fornecedor.whatsapp); setObservacoes(fornecedor.observacoes || '');
     };
 
     const handleDelete = (id) => {
@@ -61,24 +58,37 @@ const GerenciarFornecedores = () => {
     };
 
     const resetForm = () => {
-        setEditingFornecedor(null);
-        setNome('');
-        setWhatsapp('');
-        setObservacoes('');
+        setEditingFornecedor(null); setNome('');
+        setWhatsapp(''); setObservacoes('');
     };
 
     return (
-        <div className="card">
+        <div className="card" data-cy="card-gerenciar-fornecedores">
             <h2><IconeCaminhao /> Gerenciar Fornecedores</h2>
             <form onSubmit={handleSalvar}>
-                <div className="form-group"><label>Nome</label><input type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da empresa" required /></div>
-                <div className="form-group"><label>WhatsApp</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required /></div>
-                <div className="form-group"><label>Observações</label><input type="text" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Ex: Entregas às terças" /></div>
-                <button type="submit" className="button-primary">{editingFornecedor ? 'Atualizar Fornecedor' : 'Adicionar Fornecedor'}</button>
+                <div className="form-group">
+                    <label>Nome</label>
+                    <input data-cy="input-fornecedor-nome" type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da empresa" required />
+                </div>
+                <div className="form-group">
+                    <label>WhatsApp</label>
+                    <input data-cy="input-fornecedor-whatsapp" type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required />
+                </div>
+                <div className="form-group">
+                    <label>Observações</label>
+                    <input data-cy="input-fornecedor-obs" type="text" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Ex: Entregas às terças" />
+                </div>
+                <button data-cy="btn-adicionar-fornecedor" type="submit" className="button-primary">{editingFornecedor ? 'Atualizar Fornecedor' : 'Adicionar Fornecedor'}</button>
                 {editingFornecedor && <button type="button" onClick={resetForm} className="button-link">Cancelar Edição</button>}
             </form>
             <div className="divider" />
-            <div className="form-group"><label>Buscar Fornecedor</label><div className="input-with-icon"><IconeBusca /><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
+            <div className="form-group">
+                <label>Buscar Fornecedor</label>
+                <div className="input-with-icon">
+                  <span className="icon"><IconeBusca /></span>
+                  <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." />
+                </div>
+            </div>
             <div className="list-container">
                 {fornecedoresFiltrados.map(f => (
                     <div key={f.id} className="list-item">

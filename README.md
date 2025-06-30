@@ -16,5 +16,13 @@ Aplicação React completa para gestão de pedidos, fornecedores, catálogo, e c
     ```bash
     npm start
     ```
-
 A aplicação estará disponível em `http://localhost:3000`.
+
+## Como Executar os Testes Automatizados
+
+1.  Certifique-se de que a aplicação esteja rodando (`npm start`).
+2.  Em um novo terminal, execute o comando para abrir a interface do Cypress:
+    ```bash
+    npm run cypress:open
+    ```
+3.  Na janela do Cypress, escolha "E2E Testing" e execute o teste `sistema_completo.cy.js`.

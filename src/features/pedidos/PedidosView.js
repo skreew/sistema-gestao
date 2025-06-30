@@ -56,9 +56,9 @@ const PedidosView = () => {
                 fornecedorId: fornecedor.id,
                 fornecedorNome: fornecedor.nome,
                 itens: itensDoPedido,
-                solicitanteEmail: user.isAnonymous ? 'Colaborador Anônimo' : user.email,
+                solicitanteEmail: user.email,
                 status: 'enviado',
-                valorTotal: 0 // Valor inicial
+                valorTotal: 0
             });
         } catch (error) {
             showModal("Erro ao salvar pedido no histórico: " + error.message);
@@ -114,7 +114,7 @@ const PedidosView = () => {
                         <div key={fornecedorId} className="pedido-fornecedor">
                             <h4>Pedido para: {fornecedor?.nome || '...'}</h4>
                             {carrinho[fornecedorId].map((item, index) => (
-                                <div key={index} className="pedido-item">
+                                <div key={index} className="list-item">
                                     <span>{item.qtd}x {item.nome} {item.observacao && <em className="sub-text">({item.observacao})</em>}</span>
                                     <button className="button-icon" onClick={() => {
                                         const novoCarrinho = { ...carrinho };

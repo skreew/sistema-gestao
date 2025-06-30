@@ -4,7 +4,7 @@ import { useUI } from '../../context/UIContext';
 import { IconeCaminhao } from '../../utils/icons';
 
 const AccessSelectionPage = () => {
-    const [view, setView] = useState('selection'); // 'selection', 'login', 'register'
+    const [view, setView] = useState('selection');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const { loginUser, registerUser } = useAuth();
@@ -19,20 +19,16 @@ const AccessSelectionPage = () => {
         }
     };
 
-// Dentro de AccessSelectionPage.js
-
-const handleRegister = async (e) => {
-    e.preventDefault();
-    try {
-        await registerUser(email, password, 'colaborador');
-        // Após o sucesso, mostre o modal
-        showModal("Cadastro realizado com sucesso! Você já pode fazer o login.");
-        // E MUDE A VIEW PARA LOGIN!
-        setView('login'); 
-    } catch (error) {
-        showModal(`Erro no cadastro: ${error.message}`);
-    }
-};
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        try {
+            await registerUser(email, password, 'colaborador');
+            // O usuário será logado automaticamente pelo onAuthStateChanged
+            showModal("Cadastro realizado com sucesso!");
+        } catch (error) {
+            showModal(`Erro no cadastro: ${error.message}`);
+        }
+    };
 
     const renderContent = () => {
         switch (view) {
@@ -41,12 +37,12 @@ const handleRegister = async (e) => {
                     <form onSubmit={handleLogin}>
                         <h3>Acessar o Sistema</h3>
                         <div className="form-group">
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
+                            <input data-cy="input-email-login" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
                         </div>
                         <div className="form-group">
-                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" required />
+                            <input data-cy="input-senha-login" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" required />
                         </div>
-                        <button type="submit" className="button-primary" style={{width: '100%'}}>Entrar</button>
+                        <button data-cy="btn-login-submit" type="submit" className="button-primary" style={{width: '100%'}}>Entrar</button>
                         <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
                     </form>
                 );
@@ -55,22 +51,22 @@ const handleRegister = async (e) => {
                     <form onSubmit={handleRegister}>
                         <h3>Registrar Novo Usuário</h3>
                         <div className="form-group">
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
+                            <input data-cy="input-email-registro" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
                         </div>
                         <div className="form-group">
-                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mínimo 6 caracteres)" required />
+                            <input data-cy="input-senha-registro" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mínimo 6 caracteres)" required />
                         </div>
-                        <button type="submit" className="button-primary" style={{width: '100%'}}>Registrar</button>
+                        <button data-cy="btn-register-submit" type="submit" className="button-primary" style={{width: '100%'}}>Registrar</button>
                         <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
                     </form>
                 );
-            default: // selection
+            default:
                 return (
                     <>
                         <p className="login-subtitle">Bem-vindo!</p>
-                        <div className="access-selection" style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                            <button onClick={() => setView('login')} className="button-primary large">Entrar</button>
-                            <button onClick={() => setView('register')} className="button-secondary large">Registrar Novo Colaborador</button>
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                            <button data-cy="btn-show-login" onClick={() => setView('login')} className="button-primary large">Entrar</button>
+                            <button data-cy="btn-show-register" onClick={() => setView('register')} className="button-secondary large">Registrar Novo Colaborador</button>
                         </div>
                     </>
                 );

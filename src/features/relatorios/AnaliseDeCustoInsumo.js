@@ -37,7 +37,7 @@ const AnaliseDeCustoInsumo = () => {
             datasets: [{
                 label: `Custo por ${insumoSelecionado[0].unidade_padrao}`,
                 data,
-                backgroundColor: 'rgba(220, 53, 69, 0.6)',
+                backgroundColor: 'rgba(217, 48, 37, 0.6)',
             }]
         }
     }, [insumoSelecionado, fornecedores]);

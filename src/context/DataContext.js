@@ -16,14 +16,12 @@ export const DataProvider = ({ children }) => {
 
     useEffect(() => {
         if (!user) {
-            setFornecedores([]);
-            setProdutosDeCompra([]);
-            setInsumos([]);
-            setProdutos([]);
-            setAllPedidos([]);
+            setFornecedores([]); setProdutosDeCompra([]); setInsumos([]);
+            setProdutos([]); setAllPedidos([]); setLoadingData(false);
             return;
         }
 
+        setLoadingData(true);
         const collectionsToFetch = [
             { name: "fornecedores", setter: setFornecedores, orderByField: "nome" },
             { name: "produtosDeCompra", setter: setProdutosDeCompra, orderByField: "nome" },
@@ -35,27 +33,18 @@ export const DataProvider = ({ children }) => {
             collectionsToFetch.push({ name: "produtosFinais", setter: setProdutos, orderByField: "nome" });
         }
 
-        setLoadingData(true);
-        const unsubscribers = collectionsToFetch.map(coll => {
-            const q = query(collection(db, coll.name), orderBy(coll.orderByField, coll.orderDirection || 'asc'));
-            return onSnapshot(q, 
-                (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    coll.setter(data);
-                },
-                (error) => {
-                    console.error("Erro ao buscar coleção: ", coll.name, error);
-                }
-            );
-        });
-        setLoadingData(false);
+        const unsubscribers = collectionsToFetch.map(coll => 
+            onSnapshot(query(collection(db, coll.name), orderBy(coll.orderByField, coll.orderDirection || 'asc')), 
+                (snapshot) => coll.setter(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))),
+                (error) => console.error("Erro ao buscar coleção:", coll.name, error)
+            )
+        );
 
+        setLoadingData(false);
         return () => unsubscribers.forEach(unsub => unsub());
     }, [user, userRole]);
 
     const value = { fornecedores, produtosDeCompra, insumos, produtos, allPedidos, loadingData };
-
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };
-
 export const useData = () => useContext(DataContext);

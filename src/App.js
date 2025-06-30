@@ -15,14 +15,11 @@ import './App.css';
 const AppContent = () => {
     const { user, userRole, logout } = useAuth();
     const { modal, closeModal, confirmationModal, handleConfirmAction, closeConfirmationModal } = useUI();
-
     const [activeTab, setActiveTab] = useState('pedidos');
+
     useEffect(() => {
-        if (userRole === 'gestor') {
-            setActiveTab('dashboard');
-        } else {
-            setActiveTab('pedidos');
-        }
+        if (userRole === 'gestor') setActiveTab('dashboard');
+        else setActiveTab('pedidos');
     }, [userRole]);
 
     return (
@@ -36,20 +33,18 @@ const AppContent = () => {
 
             <header className="main-header">
                 <div className="user-info">Bem-vindo, {user.email} (<b>{userRole}</b>)</div>
-                <button onClick={logout} className="button-primary">
+                <button onClick={logout} className="button-primary" data-cy="btn-logout">
                     <IconeLogout /> Sair
                 </button>
             </header>
-
             <nav className="main-nav">
-                {userRole === 'gestor' && <button className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><IconeDashboard /> Dashboard</button>}
-                <button className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => setActiveTab('pedidos')}><IconeCarrinho /> Pedidos</button>
-                <button className={`nav-button ${activeTab === 'cadastros' ? 'active' : ''}`} onClick={() => setActiveTab('cadastros')}><IconeCadastro /> Cadastros</button>
-                {userRole === 'gestor' && <button className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => setActiveTab('cmv')}><IconeCmv /> CMV & Produtos</button>}
-                {userRole === 'gestor' && <button className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`} onClick={() => setActiveTab('relatorios')}><IconeGrafico /> Relatórios</button>}
-                 <button className={`nav-button ${activeTab === 'historico' ? 'active' : ''}`} onClick={() => setActiveTab('historico')}><IconeHistorico /> Histórico</button>
+                {userRole === 'gestor' && <button data-cy="nav-dashboard" className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><IconeDashboard /> Dashboard</button>}
+                <button data-cy="nav-pedidos" className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => setActiveTab('pedidos')}><IconeCarrinho /> Pedidos</button>
+                <button data-cy="nav-cadastros" className={`nav-button ${activeTab === 'cadastros' ? 'active' : ''}`} onClick={() => setActiveTab('cadastros')}><IconeCadastro /> Cadastros</button>
+                {userRole === 'gestor' && <button data-cy="nav-cmv" className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => setActiveTab('cmv')}><IconeCmv /> CMV & Produtos</button>}
+                {userRole === 'gestor' && <button data-cy="nav-relatorios" className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`} onClick={() => setActiveTab('relatorios')}><IconeGrafico /> Relatórios</button>}
+                <button data-cy="nav-historico" className={`nav-button ${activeTab === 'historico' ? 'active' : ''}`} onClick={() => setActiveTab('historico')}><IconeHistorico /> Histórico</button>
             </nav>
-
             <main className="container">
                 {activeTab === 'dashboard' && userRole === 'gestor' && <DashboardView />}
                 {activeTab === 'pedidos' && <PedidosView />}
@@ -64,11 +59,7 @@ const AppContent = () => {
 
 function App() {
     const { user, loadingAuth } = useAuth();
-
-    if (loadingAuth) {
-        return <div className="loading-screen">Carregando...</div>;
-    }
-
+    if (loadingAuth) return <div className="loading-screen">Carregando...</div>;
     return user ? <AppContent /> : <AccessSelectionPage />;
 }
 

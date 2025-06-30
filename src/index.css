@@ -1,14 +1,13 @@
 :root {
-  --cor-primaria: #007bff;
-  --cor-secundaria: #6c757d;
-  --cor-sucesso: #28a745;
-  --cor-perigo: #dc3545;
-  --cor-fundo: #f4f7f9;
-  --cor-texto: #333;
+  --cor-primaria: #0033a0;      /* Azul Ipiranga */
+  --cor-secundaria: #ffde00;    /* Amarelo Ipiranga */
+  --cor-sucesso: #009e4d;       /* Verde Ipiranga */
+  --cor-perigo: #d93025;        /* Vermelho para alertas */
+  --cor-fundo: #f8f9fa;         /* Cinza muito claro */
+  --cor-texto: #212529;         /* Texto escuro */
   --cor-borda: #dee2e6;
-  --sombra-card: 0 4px 8px rgba(0, 0, 0, 0.08);
+  --sombra-card: 0 4px 8px rgba(0, 0, 0, 0.05);
 }
-
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -20,7 +19,4 @@ body {
   color: var(--cor-texto);
   line-height: 1.6;
 }
-
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }

@@ -14,7 +14,6 @@ const DashboardView = () => {
             return { barChartData: null, lineChartData: null };
         }
 
-        // --- Gráfico de Barras: Gastos por Fornecedor ---
         const gastosPorFornecedor = allPedidos.reduce((acc, pedido) => {
             if(pedido.status === 'finalizado') {
                 const nome = pedido.fornecedorNome || 'Sem Fornecedor';
@@ -29,11 +28,10 @@ const DashboardView = () => {
             datasets: [{
                 label: 'Gastos Totais por Fornecedor (R$)',
                 data: Object.values(gastosPorFornecedor),
-                backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                backgroundColor: 'rgba(0, 51, 160, 0.6)',
             }],
         };
 
-        // --- Gráfico de Linha: Gastos Mensais ---
         const gastosPorMes = allPedidos.reduce((acc, pedido) => {
             if (pedido.status === 'finalizado' && pedido.criadoEm) {
                 const mesAno = new Date(pedido.criadoEm.seconds * 1000).toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit' });
@@ -55,7 +53,7 @@ const DashboardView = () => {
                 label: 'Gastos Mensais (R$)',
                 data: sortedMonths.map(mes => gastosPorMes[mes]),
                 fill: false,
-                borderColor: 'rgb(220, 53, 69)',
+                borderColor: 'rgb(217, 48, 37)',
                 tension: 0.1
             }]
         };
