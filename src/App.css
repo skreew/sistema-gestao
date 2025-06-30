@@ -56,7 +56,7 @@ button { cursor: pointer; border: 1px solid transparent; border-radius: 4px; pad
 
 /* --- Páginas de Login --- */
 .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-.login-card { width: 100%; max-width: 400px; text-align: center; }
+.login-card { width: 100%; max-width: 450px; text-align: center; }
 
 /* --- Específicos --- */
 .variantes-manager { border: 1px solid var(--cor-borda); border-radius: 6px; padding: 1rem; margin-top: 1.5rem; }
@@ -64,14 +64,26 @@ button { cursor: pointer; border: 1px solid transparent; border-radius: 4px; pad
 .variantes-tabs button { background-color: #f8f9fa; border: 1px solid var(--cor-borda); }
 .variantes-tabs button.active { background-color: var(--cor-primaria); color: white; border-color: var(--cor-primaria); }
 
+.disabled-card { position: relative; opacity: 0.7; pointer-events: none; }
+.disabled-card .overlay-message { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255, 255, 255, 0.8); display: flex; justify-content: center; align-items: center; text-align: center; padding: 1rem; border-radius: 8px; font-weight: bold; color: var(--cor-texto); z-index: 5; }
+.disabled-card .overlay-message p { background-color: var(--cor-secundaria); padding: 1rem; border-radius: 8px; box-shadow: var(--sombra-card); }
+
 /* --- Layouts Responsivos --- */
 .grid-responsive { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 2rem; }
 @media (max-width: 992px) { .grid-responsive { grid-template-columns: 1fr; } }
 @media (max-width: 768px) {
     .main-header { flex-direction: column; gap: 0.75rem; padding: 1rem; }
-    .nav-button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+    .hamburger-menu-button { display: block; background: none; border: none; color: var(--cor-texto); padding: 0.5rem; align-self: flex-end; order: -1; }
+    .main-nav { flex-direction: column; width: 100%; display: none; background-color: #002b85; padding: 1rem 0; }
+    .main-nav.open { display: flex; }
+    .nav-button { width: 100%; justify-content: flex-start; padding: 0.75rem 2rem; font-size: 1rem; border-radius: 0; }
+    .desktop-only { display: none; }
+    .mobile-only { display: block; }
+
     .container { padding: 1rem; }
     .card { padding: 1.25rem; }
     .card h2 { font-size: 1.25rem; }
     .form-group-inline { flex-direction: column; align-items: stretch; gap: 1rem; }
+    .list-container { max-height: 250px; padding-right: 0.5rem; }
 }
+@media (min-width: 769px) { .hamburger-menu-button, .mobile-only { display: none; } .desktop-only { display: block; } }

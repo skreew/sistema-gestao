@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Modal = ({ children, onConfirm, showCancel, onCancel, title, confirmText = "Fechar" }) => (
+const Modal = ({ children, onConfirm, showCancel, onCancel, title, confirmText = "OK" }) => (
     <div className="modal-overlay">
         <div className="modal-content">
             {title && <h2>{title}</h2>}
@@ -14,5 +14,4 @@ const Modal = ({ children, onConfirm, showCancel, onCancel, title, confirmText =
         </div>
     </div>
 );
-
 export default Modal;

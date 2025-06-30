@@ -4,7 +4,7 @@ import { useData } from '../../context/DataContext';
 import { addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
 import { IconeCatalogo, IconeBusca, IconeEditar, IconeLixeira } from '../../utils/icons';
 
-const GerenciarCatalogo = () => {
+const GerenciarCatalogo = ({ isDisabled }) => { // Accept isDisabled prop
     const { showModal, showConfirmationModal } = useUI();
     const { produtosDeCompra, fornecedores } = useData();
 
@@ -92,14 +92,14 @@ const GerenciarCatalogo = () => {
     };
 
     const handleDelete = (id) => {
-         showConfirmationModal("Excluir este produto do catálogo?", async () => {
-            try {
-                await deleteDocument("produtosDeCompra", id);
-                showModal("Produto excluído.");
-            } catch (error) {
-                showModal("Erro ao excluir: " + error.message);
-            }
-        });
+            showConfirmationModal("Excluir este produto do catálogo?", async () => {
+                try {
+                    await deleteDocument("produtosDeCompra", id);
+                    showModal("Produto excluído.");
+                } catch (error) {
+                    showModal("Erro ao excluir: " + error.message);
+                }
+            });
     };
 
     const resetForm = () => { setEditing(null); setFormState(initialState); };
@@ -110,9 +110,14 @@ const GerenciarCatalogo = () => {
     };
 
     return (
-        <div className="card">
+        <div className={`card ${isDisabled ? 'disabled-card' : ''}`}> {/* Add disabled-card class */}
             <h2><IconeCatalogo /> Gerenciar Catálogo de Compra</h2>
-            <form onSubmit={handleSalvar}>
+            {isDisabled && (
+                <div className="overlay-message">
+                    <p>Primeiro, cadastre um fornecedor em "Gerenciar Fornecedores" para adicionar produtos ao catálogo.</p>
+                </div>
+            )}
+            <form onSubmit={handleSalvar} style={{pointerEvents: isDisabled ? 'none' : 'auto', opacity: isDisabled ? 0.6 : 1}}>
                 <div className="form-group"><label>Nome do Produto no Catálogo</label><input name="nome" type="text" value={formState.nome} onChange={handleFormChange} placeholder="Ex: Queijo Mussarela Peça" required /></div>
                 <div className="form-group"><label>Como o produto é medido?</label><select name="detalheCompra.tipoBase" value={formState.detalheCompra.tipoBase} onChange={handleFormChange}><option value="peso">Por Peso (g, kg)</option><option value="volume">Por Volume (ml, L)</option><option value="unidade">Por Unidade (un, cx, pct)</option></select></div>
                 <div className="form-group-inline">
@@ -127,7 +132,7 @@ const GerenciarCatalogo = () => {
             <div className="divider" />
             <div className="form-group"><label>Buscar Produto</label><div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
             <div className="list-container">
-                {produtosFiltrados.map(p => (
+                {produtosFiltrados.length > 0 ? produtosFiltrados.map(p => (
                     <div key={p.id} className="list-item">
                         <div className="list-item-info">
                             <p><strong>{p.nome}</strong></p>
@@ -136,11 +141,11 @@ const GerenciarCatalogo = () => {
                             <p className="sub-text">Fornecedor: {fornecedores.find(f => f.id === p.fornecedorId)?.nome || 'N/A'}</p>
                         </div>
                         <div className="list-item-actions">
-                            <button className="button-icon" onClick={() => handleEditar(p)}><IconeEditar /></button>
-                            <button className="button-icon" onClick={() => handleDelete(p.id)}><IconeLixeira /></button>
+                            <button className="button-icon" onClick={() => handleEditar(p)} aria-label={`Editar produto ${p.nome}`}><IconeEditar /></button>
+                            <button className="button-icon" onClick={() => handleDelete(p.id)} aria-label={`Excluir produto ${p.nome}`}><IconeLixeira /></button>
                         </div>
                     </div>
-                ))}
+                )) : <p className="sub-text">Nenhum produto cadastrado no catálogo.</p>}
             </div>
         </div>
     );

@@ -19,10 +19,7 @@ export const UIProvider = ({ children }) => {
         closeConfirmationModal();
     };
 
-    const value = {
-        modal, showModal, closeModal,
-        confirmationModal, showConfirmationModal, closeConfirmationModal, handleConfirmAction
-    };
+    const value = { modal, showModal, closeModal, confirmationModal, showConfirmationModal, closeConfirmationModal, handleConfirmAction };
 
     return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
 };

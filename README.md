@@ -1,6 +1,6 @@
-# Sistema de Pedidos e Gestão v1.0
+# Sistema de Pedidos e Gestão v1.1 (Refatorado)
 
-Aplicação React completa para gestão de pedidos, fornecedores, catálogo, e cálculo de Custo de Mercadoria Vendida (CMV).
+Aplicação React completa para gestão de pedidos, fornecedores, catálogo, e cálculo de Custo de Mercadoria Vendida (CMV), com fluxos de trabalho otimizados para maior intuitividade.
 
 ## Como Iniciar
 

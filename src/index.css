@@ -1,10 +1,10 @@
 :root {
-  --cor-primaria: #0033a0;      /* Azul Ipiranga */
-  --cor-secundaria: #ffde00;    /* Amarelo Ipiranga */
-  --cor-sucesso: #009e4d;       /* Verde Ipiranga */
-  --cor-perigo: #d93025;        /* Vermelho para alertas */
-  --cor-fundo: #f8f9fa;         /* Cinza muito claro */
-  --cor-texto: #212529;         /* Texto escuro */
+  --cor-primaria: #0033a0;
+  --cor-secundaria: #ffde00;
+  --cor-sucesso: #009e4d;
+  --cor-perigo: #d93025;
+  --cor-fundo: #f8f9fa;
+  --cor-texto: #212529;
   --cor-borda: #dee2e6;
   --sombra-card: 0 4px 8px rgba(0, 0, 0, 0.05);
 }

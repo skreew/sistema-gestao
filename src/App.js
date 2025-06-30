@@ -1,26 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/Auth';
 import { useUI } from './context/UIContext';
 import AccessSelectionPage from './components/auth/AccessSelectionPage';
 import Modal from './components/ui/Modal';
 import DashboardView from './features/dashboard/DashboardView';
 import PedidosView from './features/pedidos/PedidosView';
-import CadastrosView from './features/cadastros/CadastrosView';
+import CatalogoView from './features/cadastros/CatalogoView'; // Renomeado e refatorado
 import CmvView from './features/cmv/CmvView';
-import HistoricoView from './features/historico/HistoricoView';
-import RelatoriosView from './features/relatorios/RelatoriosView';
-import { IconeLogout, IconeCarrinho, IconeCadastro, IconeCmv, IconeHistorico, IconeGrafico, IconeDashboard } from './utils/icons';
+import RelatoriosView from './features/relatorios/RelatoriosView'; // Agora inclui Histórico e Análises
+import OnboardingView from './features/onboarding/OnboardingView';
+import { IconeLogout, IconeCarrinho, IconeFichaTecnica, IconeGrafico, IconeDashboard, IconeAnalises, IconeConfiguracoes } from './utils/icons'; // Corrigido '=>' para 'from'
 import './App.css';
 
 const AppContent = () => {
-    const { user, userRole, logout } = useAuth();
+    const { user, userRole, logout, userProfile } = useAuth();
     const { modal, closeModal, confirmationModal, handleConfirmAction, closeConfirmationModal } = useUI();
     const [activeTab, setActiveTab] = useState('pedidos');
+    const [isNavOpen, setIsNavOpen] = useState(false);
 
     useEffect(() => {
-        if (userRole === 'gestor') setActiveTab('dashboard');
-        else setActiveTab('pedidos');
-    }, [userRole]);
+        if (userRole === 'gestor' && userProfile && userProfile.onboardingComplete === false) {
+            setActiveTab('onboarding');
+        } else if (userRole === 'gestor') {
+            setActiveTab('dashboard');
+        } else {
+            setActiveTab('pedidos');
+        }
+    }, [userRole, userProfile]);
+
+    const handleTabClick = (tabName) => {
+        setActiveTab(tabName);
+        setIsNavOpen(false); // Fecha o menu mobile ao selecionar uma opção
+    };
+
+    const isOnboardingNeeded = user && userRole === 'gestor' && userProfile && userProfile.onboardingComplete === false;
+
+    // Função para renderizar o conteúdo da aba ativa
+    const renderActiveView = () => {
+        if (isOnboardingNeeded) return <OnboardingView />;
+        switch (activeTab) {
+            case 'dashboard': return userRole === 'gestor' ? <DashboardView /> : <PedidosView />;
+            case 'pedidos': return <PedidosView />;
+            case 'catalogo': return <CatalogoView />; // Usar o novo CatalogoView
+            case 'cmv': return userRole === 'gestor' ? <CmvView /> : null;
+            case 'analises': return userRole === 'gestor' ? <RelatoriosView /> : null;
+            case 'onboarding': return <OnboardingView />; // Manter para acesso direto se necessário
+            default: return <PedidosView />;
+        }
+    };
 
     return (
         <div className="App">
@@ -33,25 +60,31 @@ const AppContent = () => {
 
             <header className="main-header">
                 <div className="user-info">Bem-vindo, {user.email} (<b>{userRole}</b>)</div>
-                <button onClick={logout} className="button-primary" data-cy="btn-logout">
-                    <IconeLogout /> Sair
+                <button className="hamburger-menu-button" onClick={() => setIsNavOpen(!isNavOpen)} aria-label="Abrir menu">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </button>
+                <button onClick={logout} className="button-primary desktop-only" data-cy="btn-logout" aria-label="Sair"><IconeLogout /> Sair</button>
             </header>
-            <nav className="main-nav">
-                {userRole === 'gestor' && <button data-cy="nav-dashboard" className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><IconeDashboard /> Dashboard</button>}
-                <button data-cy="nav-pedidos" className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => setActiveTab('pedidos')}><IconeCarrinho /> Pedidos</button>
-                <button data-cy="nav-cadastros" className={`nav-button ${activeTab === 'cadastros' ? 'active' : ''}`} onClick={() => setActiveTab('cadastros')}><IconeCadastro /> Cadastros</button>
-                {userRole === 'gestor' && <button data-cy="nav-cmv" className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => setActiveTab('cmv')}><IconeCmv /> CMV & Produtos</button>}
-                {userRole === 'gestor' && <button data-cy="nav-relatorios" className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`} onClick={() => setActiveTab('relatorios')}><IconeGrafico /> Relatórios</button>}
-                <button data-cy="nav-historico" className={`nav-button ${activeTab === 'historico' ? 'active' : ''}`} onClick={() => setActiveTab('historico')}><IconeHistorico /> Histórico</button>
+
+            <nav className={`main-nav ${isNavOpen ? 'open' : ''}`}>
+                {userRole === 'gestor' && <button data-cy="nav-dashboard" className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleTabClick('dashboard')}><IconeDashboard /> Dashboard</button>}
+                <button data-cy="nav-pedidos" className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => handleTabClick('pedidos')}><IconeCarrinho /> Pedidos</button>
+
+                {/* Botão Catálogo visível para ambos os perfis */}
+                <button data-cy="nav-catalogo" className={`nav-button ${activeTab === 'catalogo' ? 'active' : ''}`} onClick={() => handleTabClick('catalogo')}><IconeConfiguracoes /> Catálogo</button>
+
+                {userRole === 'gestor' && (
+                    <>
+                        <button data-cy="nav-fichas-tecnicas" className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => handleTabClick('cmv')}><IconeFichaTecnica /> Fichas Técnicas</button>
+                        <button data-cy="nav-analises" className={`nav-button ${activeTab === 'analises' ? 'active' : ''}`} onClick={() => handleTabClick('analises')}><IconeAnalises /> Análises</button>
+                    </>
+                )}
+
+                <button onClick={logout} className="button-primary mobile-only" data-cy="btn-logout-mobile" aria-label="Sair"><IconeLogout /> Sair</button>
             </nav>
+
             <main className="container">
-                {activeTab === 'dashboard' && userRole === 'gestor' && <DashboardView />}
-                {activeTab === 'pedidos' && <PedidosView />}
-                {activeTab === 'cadastros' && <CadastrosView />}
-                {activeTab === 'cmv' && userRole === 'gestor' && <CmvView />}
-                {activeTab === 'historico' && <HistoricoView />}
-                {activeTab === 'relatorios' && userRole === 'gestor' && <RelatoriosView />}
+                {renderActiveView()}
             </main>
         </div>
     );

@@ -6,11 +6,19 @@ import textwrap
 # 1. Ajustado o fluxo de registro para manter o usuário logado após o cadastro.
 # 2. Atualizado o teste de registro para validar o login automático.
 # 3. Corrigido o método de validação do cy.session() para ser compatível com Firebase v9+.
+# 4. Implementação do "Super Cadastro" (CatalogoView.js).
+# 5. Centralização da comparação de preços em PedidosView.js.
+# 6. Reorganização da navegação principal.
+# 7. CORREÇÃO DE ERROS DE COMPILAÇÃO: IconeGrafico e uso de insumoForm em CMVView.
+# 8. CORREÇÃO DE SINTAXE DE IMPORT: import { ... } => 'chart.js' para import { ... } from 'chart.js'.
+# 9. CORREÇÃO DE SINTAXE DE IMPORT: import { db } = '../firebase' para import { db } from '../firebase'.
+# 10. CORREÇÃO DE SINTAXE DE IMPORT: import { ... } => './utils/icons' para import { ... } from './utils/icons' em App.js.
+# 11. CORREÇÃO DE SINTAXE DE COMENTÁRIOS: Comentários Python (#) para JavaScript (//) em Auth.js.
 
 PACKAGE_JSON_CONTENT = textwrap.dedent("""
     {
       "name": "sistema-pedidos-100",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "private": true,
       "dependencies": {
         "chart.js": "^3.9.1",
@@ -66,9 +74,9 @@ GITIGNORE_CONTENT = textwrap.dedent("""
 """)
 
 README_MD_CONTENT = textwrap.dedent("""
-    # Sistema de Pedidos e Gestão v1.0
+    # Sistema de Pedidos e Gestão v1.1 (Refatorado)
 
-    Aplicação React completa para gestão de pedidos, fornecedores, catálogo, e cálculo de Custo de Mercadoria Vendida (CMV).
+    Aplicação React completa para gestão de pedidos, fornecedores, catálogo, e cálculo de Custo de Mercadoria Vendida (CMV), com fluxos de trabalho otimizados para maior intuitividade.
 
     ## Como Iniciar
 
@@ -110,7 +118,7 @@ CYPRESS_CONFIG_JS_CONTENT = textwrap.dedent("""
     });
 """)
 
-# CORREÇÕES DE TESTE APLICADAS
+# CORREÇÕES E ADAPTAÇÕES PARA OS NOVOS FLUXOS
 CYPRESS_TEST_FILE_CONTENT = textwrap.dedent("""
     // cypress/e2e/sistema_completo.cy.js
 
@@ -140,12 +148,14 @@ CYPRESS_TEST_FILE_CONTENT = textwrap.dedent("""
         cy.contains('.user-info', `Bem-vindo, ${emailColaborador}`, { timeout: 10000 }).should('be.visible');
         cy.get('[data-cy=nav-dashboard]').should('not.exist');
         cy.get('[data-cy=nav-pedidos]').should('be.visible');
+        // Colaborador agora pode acessar 'Catálogo' (antigo Cadastros)
+        cy.get('[data-cy=nav-catalogo]').should('be.visible');
       });
     });
 
     describe('Fluxos do Gestor', () => {
       beforeEach(() => {
-        cy.intercept('POST', '**/firestore.googleapis.com/**').as('firebaseFirestore');
+        cy.intercept('POST', '**/identitytoolkit.googleapis.com/**').as('firebaseAuth');
 
         cy.session('gestorLogado', () => {
           cy.visit('/');
@@ -157,7 +167,6 @@ CYPRESS_TEST_FILE_CONTENT = textwrap.dedent("""
           cy.contains('.user-info', 'Bem-vindo, admin@gmail.com', { timeout: 10000 }).should('be.visible');
         }, {
           validate() {
-            // Valida a sessão verificando um elemento que só existe quando logado.
             cy.get('[data-cy="btn-logout"]').should('be.visible');
           },
         });
@@ -166,36 +175,144 @@ CYPRESS_TEST_FILE_CONTENT = textwrap.dedent("""
         cy.contains('.user-info', 'Bem-vindo, admin@gmail.com', { timeout: 10000 }).should('be.visible');
       });
 
-      it('deve cadastrar um novo fornecedor e verificar todos os dados', () => {
-        const fornecedor = {
-          nome: `Fornecedor Robusto ${Date.now()}`,
-          whatsapp: '11987654321',
-          obs: 'Teste completo de ponta a ponta'
-        };
+      it('deve navegar pelas novas abas do menu (gestor)', () => {
+        cy.get('[data-cy=nav-dashboard]').click();
+        cy.contains('h2', 'Dashboard Gerencial').should('be.visible');
 
-        cy.get('[data-cy=nav-cadastros]').click();
-        
+        cy.get('[data-cy=nav-pedidos]').click();
+        cy.contains('h2', 'Fazer um Pedido').should('be.visible');
+
+        cy.get('[data-cy=nav-catalogo]').click(); // Nova data-cy para o Catálogo
+        cy.contains('h2', 'Catálogo de Insumos e Fornecedores').should('be.visible');
+
+        cy.get('[data-cy=nav-fichas-tecnicas]').click(); // Nova data-cy para Fichas Técnicas
+        cy.contains('h2', 'Gerenciar Produtos Finais (Fichas Técnicas)').should('be.visible');
+
+        cy.get('[data-cy=nav-analises]').click(); // Nova data-cy para Análises
+        cy.contains('h2', 'Análises e Histórico').should('be.visible');
+      });
+
+
+      it('deve seguir o fluxo completo: cadastrar fornecedor, insumo com preço, ficha técnica e verificar CMV, e fazer pedido com comparação', () => {
+        const fornecedorNome1 = `Fornecedor Teste ${Date.now()}`;
+        const fornecedorNome2 = `Fornecedor Alternativo ${Date.now()}`;
+        const insumoNome = `Açúcar Teste ${Date.now()}`;
+        const produtoFinalNome = `Bolo de Açúcar ${Date.now()}`;
+
+        // 1. Cadastrar Fornecedor 1
+        cy.get('[data-cy=nav-catalogo]').click();
         cy.get('[data-cy=card-gerenciar-fornecedores]').within(() => {
-          cy.get('[data-cy=input-fornecedor-nome]').type(fornecedor.nome);
-          cy.get('[data-cy=input-fornecedor-whatsapp]').type(fornecedor.whatsapp);
-          cy.get('[data-cy=input-fornecedor-obs]').type(fornecedor.obs);
-          cy.get('[data-cy=btn-adicionar-fornecedor]').click();
+            cy.get('[data-cy=input-fornecedor-nome]').type(fornecedorNome1);
+            cy.get('[data-cy=input-fornecedor-whatsapp]').type('11987654321');
+            cy.get('[data-cy=btn-adicionar-fornecedor]').click();
         });
-        
-        cy.wait('@firebaseFirestore');
+        cy.contains('Fornecedor salvo!').should('be.visible').get('[data-cy=modal-confirm-button]').click();
+        cy.wait(500); // Dar tempo para o Firebase atualizar
 
-        cy.contains('Fornecedor salvo!').should('be.visible');
-        cy.get('[data-cy=modal-confirm-button]').click();
+        // 2. Cadastrar Fornecedor 2 (para comparação de preços)
+        cy.get('[data-cy=card-gerenciar-fornecedores]').within(() => {
+            cy.get('[data-cy=input-fornecedor-nome]').clear().type(fornecedorNome2);
+            cy.get('[data-cy=input-fornecedor-whatsapp]').clear().type('21998765432');
+            cy.get('[data-cy=btn-adicionar-fornecedor]').click();
+        });
+        cy.contains('Fornecedor salvo!').should('be.visible').get('[data-cy=modal-confirm-button]').click();
+        cy.wait(500); // Dar tempo para o Firebase atualizar
+
+        // 3. Cadastrar Insumo e registrar primeira compra (Fornecedor 1, mais caro)
+        // Navegar para a aba "Lista de Insumos" no Catálogo para ver o formulário
+        cy.get('.variantes-tabs').contains('button', 'Lista de Insumos').click();
+        cy.get('.card').contains('h3', 'Seus Insumos Cadastrados').should('be.visible');
         
-        const whatsAppFormatado = `(${fornecedor.whatsapp.substring(0, 2)}) ${fornecedor.whatsapp.substring(2, 7)}-${fornecedor.whatsapp.substring(7)}`;
+        cy.get('.card').contains('h3', 'Registrar Nova Compra / Cadastrar Insumo').parent().within(() => {
+            cy.get('input[name="nome"]').type(insumoNome);
+            cy.get('select[name="unidadeAnalise"]').select('kg');
+            cy.get('select[name="fornecedorId"]').select(fornecedorNome1);
+            cy.get('input[name="quantidadeComprada"]').type('10'); // 10 kg
+            cy.get('input[name="precoTotalNota"]').type('50');   // R$ 50.00 -> R$ 5/kg
+            cy.get('button[type="submit"]').click();
+        });
+        cy.contains('Compra registrada para').should('be.visible').get('[data-cy=modal-confirm-button]').click();
+        cy.wait(500);
+
+        // 4. Registrar segunda compra para o mesmo insumo (Fornecedor 2, mais barato)
+        cy.get('.card').contains('h3', 'Registrar Nova Compra / Cadastrar Insumo').parent().within(() => {
+            cy.get('input[name="nome"]').clear().type(insumoNome); // Re-seleciona o insumo
+            cy.get('select[name="fornecedorId"]').select(fornecedorNome2);
+            cy.get('input[name="quantidadeComprada"]').clear().type('10'); // 10 kg
+            cy.get('input[name="precoTotalNota"]').clear().type('40');   // R$ 40.00 -> R$ 4/kg
+            cy.get('button[type="submit"]').click();
+        });
+        cy.contains('Compra registrada para').should('be.visible').get('[data-cy=modal-confirm-button]').click();
+        cy.wait(500);
+
+        // 5. Criar Ficha Técnica para o Produto Final
+        cy.get('[data-cy=nav-fichas-tecnicas]').click(); // Navegar para Fichas Técnicas
+        cy.get('.card').contains('h2', 'Gerenciar Produtos Finais (Fichas Técnicas)').should('be.visible');
+
+        cy.get('[data-cy=card-gerenciar-produtos-finais]').within(() => {
+            cy.get('input[placeholder="Ex: Pizza"]').type(produtoFinalNome);
+            cy.get('input[placeholder="Ex: Pizzas Salgadas"]').type('Doces');
+            cy.get('input[placeholder="Ex: Grande"]').type('Padrão'); // Nome da variante
+            cy.get('input[placeholder="1.50"]').type('0.50'); // Custo Embalagem
+            cy.get('input[placeholder="3.00"]').type('1.00'); // Outros Custos
+            
+            // Adicionar insumo na ficha técnica (deve pegar o melhor preço automaticamente)
+            const textoInsumoFicha = `${insumoNome} - R$ 4,00000/kg`;
+            cy.get('select[aria-label="Selecione um item de compra"]').select(textoInsumoFicha);
+            cy.get('input[aria-label="Quantidade do item de compra"]').type('0.25'); // 250g de açúcar (assumindo entrada em kg, mas o label sugere g/ml)
+            cy.get('button[aria-label="Adicionar item à ficha técnica"]').click();
+
+            cy.get('button[type="submit"]').contains('Salvar Novo Produto').click();
+        });
+        cy.contains('Produto salvo!').should('be.visible').get('[data-cy=modal-confirm-button]').click();
+
+        // Verificar CMV calculado para o produto final
+        // Custo Insumo: 0.25kg * R$ 4/kg = R$ 1.00
+        // Outros Custos: 0.50 (embalagem) + 1.00 (operacional) = R$ 1.50
+        // CMV Total = 1.00 + 1.50 = R$ 2.50
+        cy.get('[data-cy=card-gerenciar-produtos-finais]').contains('.list-item', produtoFinalNome).parents('.card').within(() => {
+            cy.contains('CMV: R$ 2,50').should('be.visible');
+        });
+
+        // 6. Fazer um pedido usando o fluxo com comparação de preços
+        cy.get('[data-cy=nav-pedidos]').click();
+        cy.contains('h2', 'Fazer um Pedido').should('be.visible');
+
+        cy.get('input[placeholder*="Digite para buscar"]').type(insumoNome);
+        cy.get('.list-container').contains('.list-item', insumoNome).should('be.visible');
         
-        cy.get('[data-cy=card-gerenciar-fornecedores] .list-container')
-          .contains(fornecedor.nome)
-          .parents('.list-item')
-          .within(() => {
-            cy.contains(whatsAppFormatado).should('be.visible');
-            cy.contains(fornecedor.obs).should('be.visible');
-          });
+        // Clicar no botão 'Ver Preços' para abrir o modal de comparação
+        cy.get('.list-container').contains('.list-item', insumoNome).within(() => {
+            cy.contains('A partir de R$ 4,00000/kg').should('be.visible');
+            cy.contains('button', 'Ver Preços').click();
+        });
+
+        // Dentro do modal de comparação de preços
+        cy.get('.modal-content').should('be.visible').within(() => {
+            cy.contains('Preços para:').should('be.visible');
+            // O fornecedor mais barato deve ser o segundo cadastrado (Fornecedor Alternativo)
+            cy.contains('.list-item', fornecedorNome2).contains('R$ 4,00000/kg').should('be.visible');
+            cy.contains('.list-item', fornecedorNome1).contains('R$ 5,00000/kg').should('be.visible');
+            
+            // Selecionar o fornecedor mais barato
+            cy.contains('.list-item', fornecedorNome2).contains('button', 'Selecionar').click();
+        });
+        cy.get('.modal-overlay').should('not.exist'); // Modal deve fechar
+
+        // Voltar na tela de pedidos, o item agora está selecionado com o fornecedor correto
+        cy.contains('Item: ').should('contain', insumoNome);
+        cy.contains('Fornecedor selecionado:').should('contain', fornecedorNome2);
+        
+        cy.get('input[aria-label="Quantidade"]').type('5'); // 5 kg
+        cy.get('button[aria-label="Adicionar item ao carrinho"]').click();
+
+        cy.contains('Itens no Carrinho').should('be.visible');
+        cy.contains('Pedido para:').should('contain', fornecedorNome2);
+        cy.contains('5x ' + insumoNome).should('be.visible');
+
+        // Enviar pedido
+        cy.contains('button', 'Enviar Pedido via WhatsApp').click();
+        cy.contains('Seu carrinho está vazio.').should('be.visible');
       });
     });
 """)
@@ -215,12 +332,12 @@ INDEX_HTML_CONTENT = textwrap.dedent("""
 
 INDEX_CSS_CONTENT = textwrap.dedent("""
     :root {
-      --cor-primaria: #0033a0;      /* Azul Ipiranga */
-      --cor-secundaria: #ffde00;    /* Amarelo Ipiranga */
-      --cor-sucesso: #009e4d;       /* Verde Ipiranga */
-      --cor-perigo: #d93025;        /* Vermelho para alertas */
-      --cor-fundo: #f8f9fa;         /* Cinza muito claro */
-      --cor-texto: #212529;         /* Texto escuro */
+      --cor-primaria: #0033a0;
+      --cor-secundaria: #ffde00;
+      --cor-sucesso: #009e4d;
+      --cor-perigo: #d93025;
+      --cor-fundo: #f8f9fa;
+      --cor-texto: #212529;
       --cor-borda: #dee2e6;
       --sombra-card: 0 4px 8px rgba(0, 0, 0, 0.05);
     }
@@ -297,7 +414,7 @@ APP_CSS_CONTENT = textwrap.dedent("""
 
     /* --- Páginas de Login --- */
     .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .login-card { width: 100%; max-width: 400px; text-align: center; }
+    .login-card { width: 100%; max-width: 450px; text-align: center; }
 
     /* --- Específicos --- */
     .variantes-manager { border: 1px solid var(--cor-borda); border-radius: 6px; padding: 1rem; margin-top: 1.5rem; }
@@ -305,17 +422,29 @@ APP_CSS_CONTENT = textwrap.dedent("""
     .variantes-tabs button { background-color: #f8f9fa; border: 1px solid var(--cor-borda); }
     .variantes-tabs button.active { background-color: var(--cor-primaria); color: white; border-color: var(--cor-primaria); }
 
+    .disabled-card { position: relative; opacity: 0.7; pointer-events: none; }
+    .disabled-card .overlay-message { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255, 255, 255, 0.8); display: flex; justify-content: center; align-items: center; text-align: center; padding: 1rem; border-radius: 8px; font-weight: bold; color: var(--cor-texto); z-index: 5; }
+    .disabled-card .overlay-message p { background-color: var(--cor-secundaria); padding: 1rem; border-radius: 8px; box-shadow: var(--sombra-card); }
+
     /* --- Layouts Responsivos --- */
     .grid-responsive { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 2rem; }
     @media (max-width: 992px) { .grid-responsive { grid-template-columns: 1fr; } }
     @media (max-width: 768px) {
         .main-header { flex-direction: column; gap: 0.75rem; padding: 1rem; }
-        .nav-button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+        .hamburger-menu-button { display: block; background: none; border: none; color: var(--cor-texto); padding: 0.5rem; align-self: flex-end; order: -1; }
+        .main-nav { flex-direction: column; width: 100%; display: none; background-color: #002b85; padding: 1rem 0; }
+        .main-nav.open { display: flex; }
+        .nav-button { width: 100%; justify-content: flex-start; padding: 0.75rem 2rem; font-size: 1rem; border-radius: 0; }
+        .desktop-only { display: none; }
+        .mobile-only { display: block; }
+
         .container { padding: 1rem; }
         .card { padding: 1.25rem; }
         .card h2 { font-size: 1.25rem; }
         .form-group-inline { flex-direction: column; align-items: stretch; gap: 1rem; }
+        .list-container { max-height: 250px; padding-right: 0.5rem; }
     }
+    @media (min-width: 769px) { .hamburger-menu-button, .mobile-only { display: none; } .desktop-only { display: block; } }
 """)
 
 FIREBASE_JS_CONTENT = textwrap.dedent("""
@@ -343,30 +472,58 @@ FIREBASE_JS_CONTENT = textwrap.dedent("""
     export { db, auth, analytics };
 """)
 
+# REESTRUTURADO: Navegação principal e renderização de views
 APP_JS_CONTENT = textwrap.dedent("""
     import React, { useState, useEffect } from 'react';
-    import { useAuth } from './context/AuthContext';
+    import { useAuth } from './context/Auth';
     import { useUI } from './context/UIContext';
     import AccessSelectionPage from './components/auth/AccessSelectionPage';
     import Modal from './components/ui/Modal';
     import DashboardView from './features/dashboard/DashboardView';
     import PedidosView from './features/pedidos/PedidosView';
-    import CadastrosView from './features/cadastros/CadastrosView';
+    import CatalogoView from './features/cadastros/CatalogoView'; // Renomeado e refatorado
     import CmvView from './features/cmv/CmvView';
-    import HistoricoView from './features/historico/HistoricoView';
-    import RelatoriosView from './features/relatorios/RelatoriosView';
-    import { IconeLogout, IconeCarrinho, IconeCadastro, IconeCmv, IconeHistorico, IconeGrafico, IconeDashboard } from './utils/icons';
+    import RelatoriosView from './features/relatorios/RelatoriosView'; // Agora inclui Histórico e Análises
+    import OnboardingView from './features/onboarding/OnboardingView';
+    import { IconeLogout, IconeCarrinho, IconeFichaTecnica, IconeGrafico, IconeDashboard, IconeAnalises, IconeConfiguracoes } from './utils/icons'; // Corrigido '=>' para 'from'
     import './App.css';
 
     const AppContent = () => {
-        const { user, userRole, logout } = useAuth();
+        const { user, userRole, logout, userProfile } = useAuth();
         const { modal, closeModal, confirmationModal, handleConfirmAction, closeConfirmationModal } = useUI();
         const [activeTab, setActiveTab] = useState('pedidos');
+        const [isNavOpen, setIsNavOpen] = useState(false);
 
         useEffect(() => {
-            if (userRole === 'gestor') setActiveTab('dashboard');
-            else setActiveTab('pedidos');
-        }, [userRole]);
+            if (userRole === 'gestor' && userProfile && userProfile.onboardingComplete === false) {
+                setActiveTab('onboarding');
+            } else if (userRole === 'gestor') {
+                setActiveTab('dashboard');
+            } else {
+                setActiveTab('pedidos');
+            }
+        }, [userRole, userProfile]);
+
+        const handleTabClick = (tabName) => {
+            setActiveTab(tabName);
+            setIsNavOpen(false); // Fecha o menu mobile ao selecionar uma opção
+        };
+
+        const isOnboardingNeeded = user && userRole === 'gestor' && userProfile && userProfile.onboardingComplete === false;
+
+        // Função para renderizar o conteúdo da aba ativa
+        const renderActiveView = () => {
+            if (isOnboardingNeeded) return <OnboardingView />;
+            switch (activeTab) {
+                case 'dashboard': return userRole === 'gestor' ? <DashboardView /> : <PedidosView />;
+                case 'pedidos': return <PedidosView />;
+                case 'catalogo': return <CatalogoView />; // Usar o novo CatalogoView
+                case 'cmv': return userRole === 'gestor' ? <CmvView /> : null;
+                case 'analises': return userRole === 'gestor' ? <RelatoriosView /> : null;
+                case 'onboarding': return <OnboardingView />; // Manter para acesso direto se necessário
+                default: return <PedidosView />;
+            }
+        };
 
         return (
             <div className="App">
@@ -379,25 +536,31 @@ APP_JS_CONTENT = textwrap.dedent("""
 
                 <header className="main-header">
                     <div className="user-info">Bem-vindo, {user.email} (<b>{userRole}</b>)</div>
-                    <button onClick={logout} className="button-primary" data-cy="btn-logout">
-                        <IconeLogout /> Sair
+                    <button className="hamburger-menu-button" onClick={() => setIsNavOpen(!isNavOpen)} aria-label="Abrir menu">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </button>
+                    <button onClick={logout} className="button-primary desktop-only" data-cy="btn-logout" aria-label="Sair"><IconeLogout /> Sair</button>
                 </header>
-                <nav className="main-nav">
-                    {userRole === 'gestor' && <button data-cy="nav-dashboard" className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><IconeDashboard /> Dashboard</button>}
-                    <button data-cy="nav-pedidos" className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => setActiveTab('pedidos')}><IconeCarrinho /> Pedidos</button>
-                    <button data-cy="nav-cadastros" className={`nav-button ${activeTab === 'cadastros' ? 'active' : ''}`} onClick={() => setActiveTab('cadastros')}><IconeCadastro /> Cadastros</button>
-                    {userRole === 'gestor' && <button data-cy="nav-cmv" className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => setActiveTab('cmv')}><IconeCmv /> CMV & Produtos</button>}
-                    {userRole === 'gestor' && <button data-cy="nav-relatorios" className={`nav-button ${activeTab === 'relatorios' ? 'active' : ''}`} onClick={() => setActiveTab('relatorios')}><IconeGrafico /> Relatórios</button>}
-                    <button data-cy="nav-historico" className={`nav-button ${activeTab === 'historico' ? 'active' : ''}`} onClick={() => setActiveTab('historico')}><IconeHistorico /> Histórico</button>
+                
+                <nav className={`main-nav ${isNavOpen ? 'open' : ''}`}>
+                    {userRole === 'gestor' && <button data-cy="nav-dashboard" className={`nav-button ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleTabClick('dashboard')}><IconeDashboard /> Dashboard</button>}
+                    <button data-cy="nav-pedidos" className={`nav-button ${activeTab === 'pedidos' ? 'active' : ''}`} onClick={() => handleTabClick('pedidos')}><IconeCarrinho /> Pedidos</button>
+                    
+                    {/* Botão Catálogo visível para ambos os perfis */}
+                    <button data-cy="nav-catalogo" className={`nav-button ${activeTab === 'catalogo' ? 'active' : ''}`} onClick={() => handleTabClick('catalogo')}><IconeConfiguracoes /> Catálogo</button>
+                    
+                    {userRole === 'gestor' && (
+                        <>
+                            <button data-cy="nav-fichas-tecnicas" className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => handleTabClick('cmv')}><IconeFichaTecnica /> Fichas Técnicas</button>
+                            <button data-cy="nav-analises" className={`nav-button ${activeTab === 'analises' ? 'active' : ''}`} onClick={() => handleTabClick('analises')}><IconeAnalises /> Análises</button>
+                        </>
+                    )}
+                    
+                    <button onClick={logout} className="button-primary mobile-only" data-cy="btn-logout-mobile" aria-label="Sair"><IconeLogout /> Sair</button>
                 </nav>
+
                 <main className="container">
-                    {activeTab === 'dashboard' && userRole === 'gestor' && <DashboardView />}
-                    {activeTab === 'pedidos' && <PedidosView />}
-                    {activeTab === 'cadastros' && <CadastrosView />}
-                    {activeTab === 'cmv' && userRole === 'gestor' && <CmvView />}
-                    {activeTab === 'historico' && <HistoricoView />}
-                    {activeTab === 'relatorios' && userRole === 'gestor' && <RelatoriosView />}
+                    {renderActiveView()}
                 </main>
             </div>
         );
@@ -417,7 +580,7 @@ INDEX_JS_CONTENT = textwrap.dedent("""
     import ReactDOM from 'react-dom/client';
     import './index.css';
     import App from './App';
-    import { AuthProvider } from './context/AuthContext';
+    import { AuthProvider } from './context/Auth';
     import { UIProvider } from './context/UIContext';
     import { DataProvider } from './context/DataContext';
 
@@ -435,12 +598,21 @@ INDEX_JS_CONTENT = textwrap.dedent("""
     );
 """)
 
-# CORREÇÃO DE FLUXO DE TESTE
 ACCESS_SELECTION_PAGE_JS_CONTENT = textwrap.dedent("""
     import React, { useState } from 'react';
-    import { useAuth } from '../../context/AuthContext';
+    import { useAuth } from '../../context/Auth';
     import { useUI } from '../../context/UIContext';
     import { IconeCaminhao } from '../../utils/icons';
+
+    function getFriendlyAuthError(errorCode) {
+        switch (errorCode) {
+            case 'auth/email-already-in-use': return 'Este e-mail já foi cadastrado.';
+            case 'auth/invalid-email': return 'O formato do e-mail é inválido.';
+            case 'auth/weak-password': return 'A senha é muito fraca. Use pelo menos 6 caracteres.';
+            case 'auth/user-not-found': case 'auth/wrong-password': return 'E-mail ou senha inválidos.';
+            default: return 'Ocorreu um erro. Tente novamente mais tarde.';
+        }
+    }
 
     const AccessSelectionPage = () => {
         const [view, setView] = useState('selection');
@@ -451,71 +623,54 @@ ACCESS_SELECTION_PAGE_JS_CONTENT = textwrap.dedent("""
 
         const handleLogin = async (e) => {
             e.preventDefault();
-            try {
-                await loginUser(email, password);
-            } catch (error) {
-                showModal("E-mail ou senha inválidos. Tente novamente.");
-            }
+            try { await loginUser(email, password); } catch (error) { showModal(getFriendlyAuthError(error.code)); }
         };
 
         const handleRegister = async (e) => {
             e.preventDefault();
             try {
+                // Por padrão, novos registros são 'colaborador'. Gestores são criados/promovidos manualmente.
                 await registerUser(email, password, 'colaborador');
-                // O usuário será logado automaticamente pelo onAuthStateChanged
                 showModal("Cadastro realizado com sucesso!");
-            } catch (error) {
-                showModal(`Erro no cadastro: ${error.message}`);
-            }
+            } catch (error) { showModal(getFriendlyAuthError(error.code)); }
         };
-
+        
         const renderContent = () => {
             switch (view) {
-                case 'login':
-                    return (
-                        <form onSubmit={handleLogin}>
-                            <h3>Acessar o Sistema</h3>
-                            <div className="form-group">
-                                <input data-cy="input-email-login" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
-                            </div>
-                            <div className="form-group">
-                                <input data-cy="input-senha-login" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" required />
-                            </div>
-                            <button data-cy="btn-login-submit" type="submit" className="button-primary" style={{width: '100%'}}>Entrar</button>
-                            <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
-                        </form>
-                    );
-                case 'register':
-                    return (
-                        <form onSubmit={handleRegister}>
-                            <h3>Registrar Novo Usuário</h3>
-                            <div className="form-group">
-                                <input data-cy="input-email-registro" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" required />
-                            </div>
-                            <div className="form-group">
-                                <input data-cy="input-senha-registro" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (mínimo 6 caracteres)" required />
-                            </div>
-                            <button data-cy="btn-register-submit" type="submit" className="button-primary" style={{width: '100%'}}>Registrar</button>
-                            <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
-                        </form>
-                    );
-                default:
-                    return (
-                        <>
-                            <p className="login-subtitle">Bem-vindo!</p>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                                <button data-cy="btn-show-login" onClick={() => setView('login')} className="button-primary large">Entrar</button>
-                                <button data-cy="btn-show-register" onClick={() => setView('register')} className="button-secondary large">Registrar Novo Colaborador</button>
-                            </div>
-                        </>
-                    );
+                case 'login': return (
+                    <form onSubmit={handleLogin}>
+                        <h3>Acessar o Sistema</h3>
+                        <div className="form-group"><input data-cy="input-email-login" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail" required /></div>
+                        <div className="form-group"><input data-cy="input-senha-login" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Senha" required /></div>
+                        <button data-cy="btn-login-submit" type="submit" className="button-primary" style={{width: '100%'}}>Entrar</button>
+                        <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
+                    </form>
+                );
+                case 'register': return (
+                    <form onSubmit={handleRegister}>
+                        <h3>Registrar Novo Colaborador</h3>
+                        <div className="form-group"><input data-cy="input-email-registro" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail" required /></div>
+                        <div className="form-group"><input data-cy="input-senha-registro" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Senha (mínimo 6 caracteres)" required /></div>
+                        <button data-cy="btn-register-submit" type="submit" className="button-primary" style={{width: '100%'}}>Registrar</button>
+                        <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
+                    </form>
+                );
+                default: return (
+                    <>
+                        <p>Bem-vindo!</p>
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem'}}>
+                            <button data-cy="btn-show-login" onClick={() => setView('login')} className="button-primary large">Entrar</button>
+                            <button data-cy="btn-show-register" onClick={() => setView('register')} className="button-secondary large">Registrar Novo Colaborador</button>
+                        </div>
+                    </>
+                );
             }
         };
 
         return (
             <div className="login-container">
                 <div className="login-card card">
-                    <h1 className="login-title"><IconeCaminhao /> Sistema de Pedidos</h1>
+                    <h1><IconeCaminhao /> Sistema de Pedidos</h1>
                     {renderContent()}
                 </div>
             </div>
@@ -525,6 +680,7 @@ ACCESS_SELECTION_PAGE_JS_CONTENT = textwrap.dedent("""
     export default AccessSelectionPage;
 """)
 
+# Refatorado: Gerenciamento de Fornecedores agora é um sub-componente interno do Catálogo
 GERENCIAR_FORNECEDORES_JS_CONTENT = textwrap.dedent("""
     import React, { useState, useMemo } from 'react';
     import { useUI } from '../../context/UIContext';
@@ -533,92 +689,65 @@ GERENCIAR_FORNECEDORES_JS_CONTENT = textwrap.dedent("""
     import { IconeCaminhao, IconeBusca, IconeEditar, IconeLixeira } from '../../utils/icons';
     import { formatarWhatsappParaLink, formatarWhatsappParaExibicao } from '../../utils/formatters';
 
-    const GerenciarFornecedores = () => {
+    // Componente interno para Gerenciar Fornecedores, usado dentro de CatalogoView
+    const GerenciarFornecedores = ({ quickAddCallback }) => {
         const { showModal, showConfirmationModal } = useUI();
         const { fornecedores } = useData();
-        const [editingFornecedor, setEditingFornecedor] = useState(null);
+        const [editing, setEditing] = useState(null);
         const [nome, setNome] = useState('');
         const [whatsapp, setWhatsapp] = useState('');
         const [observacoes, setObservacoes] = useState('');
         const [busca, setBusca] = useState('');
 
-        const fornecedoresFiltrados = useMemo(() =>
+        const filtered = useMemo(() =>
             fornecedores.filter(f => f.nome.toLowerCase().includes(busca.toLowerCase())),
             [fornecedores, busca]
         );
 
-        const handleSalvar = async (e) => {
+        const handleSave = async (e) => {
             e.preventDefault();
-            const numeroFormatado = formatarWhatsappParaLink(whatsapp);
-            if (!nome || !numeroFormatado) {
+            const formattedNumber = formatarWhatsappParaLink(whatsapp);
+            if (!nome || !formattedNumber) {
                 showModal('Preencha o nome e um WhatsApp válido.');
                 return;
             }
-            const data = { nome, whatsapp: numeroFormatado, observacoes: observacoes || null };
+            const data = { nome, whatsapp: formattedNumber, observacoes: observacoes || null };
             try {
-                if (editingFornecedor) {
-                    await updateDocument("fornecedores", editingFornecedor.id, data);
+                if (editing) {
+                    await updateDocument("fornecedores", editing.id, data);
                     showModal('Fornecedor atualizado!');
                 } else {
-                    await addDocument("fornecedores", data);
+                    const docRef = await addDocument("fornecedores", data);
                     showModal('Fornecedor salvo!');
+                    if (quickAddCallback) quickAddCallback(docRef.id); // Notifica o pai se for um quick add
                 }
                 resetForm();
-            } catch (error) {
-                showModal('Erro ao salvar: ' + error.message);
-            }
+            } catch (error) { showModal('Erro ao salvar: ' + error.message); }
         };
 
-        const handleEditar = (fornecedor) => {
-            setEditingFornecedor(fornecedor); setNome(fornecedor.nome);
-            setWhatsapp(fornecedor.whatsapp); setObservacoes(fornecedor.observacoes || '');
-        };
-
-        const handleDelete = (id) => {
-            showConfirmationModal("Excluir este fornecedor?", async () => {
-                try {
-                    await deleteDocument("fornecedores", id);
-                    showModal("Fornecedor excluído.");
-                } catch (error) {
-                    showModal("Erro ao excluir: " + error.message);
-                }
-            });
-        };
-
-        const resetForm = () => {
-            setEditingFornecedor(null); setNome('');
-            setWhatsapp(''); setObservacoes('');
-        };
+        const handleEdit = (f) => { setEditing(f); setNome(f.nome); setWhatsapp(f.whatsapp); setObservacoes(f.observacoes || ''); };
+        const handleDelete = (id) => { showConfirmationModal("Excluir este fornecedor?", async () => {
+            try { await deleteDocument("fornecedores", id); showModal("Fornecedor excluído."); }
+            catch (error) { showModal("Erro ao excluir: " + error.message); }
+        }); };
+        const resetForm = () => { setEditing(null); setNome(''); setWhatsapp(''); setObservacoes(''); };
 
         return (
             <div className="card" data-cy="card-gerenciar-fornecedores">
                 <h2><IconeCaminhao /> Gerenciar Fornecedores</h2>
-                <form onSubmit={handleSalvar}>
-                    <div className="form-group">
-                        <label>Nome</label>
-                        <input data-cy="input-fornecedor-nome" type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da empresa" required />
-                    </div>
-                    <div className="form-group">
-                        <label>WhatsApp</label>
-                        <input data-cy="input-fornecedor-whatsapp" type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required />
-                    </div>
-                    <div className="form-group">
-                        <label>Observações</label>
-                        <input data-cy="input-fornecedor-obs" type="text" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Ex: Entregas às terças" />
-                    </div>
-                    <button data-cy="btn-adicionar-fornecedor" type="submit" className="button-primary">{editingFornecedor ? 'Atualizar Fornecedor' : 'Adicionar Fornecedor'}</button>
-                    {editingFornecedor && <button type="button" onClick={resetForm} className="button-link">Cancelar Edição</button>}
+                <form onSubmit={handleSave}>
+                    <div className="form-group"><label>Nome</label><input data-cy="input-fornecedor-nome" type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome da empresa" required /></div>
+                    <div className="form-group"><label>WhatsApp</label><input data-cy="input-fornecedor-whatsapp" type="text" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required /></div>
+                    <div className="form-group"><label>Observações</label><input data-cy="input-fornecedor-obs" type="text" value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Ex: Entregas às terças" /></div>
+                    <button data-cy="btn-adicionar-fornecedor" type="submit" className="button-primary">{editing ? 'Atualizar' : 'Adicionar'}</button>
+                    {editing && <button type="button" onClick={resetForm} className="button-link">Cancelar Edição</button>}
                 </form>
                 <div className="divider" />
                 <div className="form-group">
-                    <label>Buscar Fornecedor</label>
-                    <div className="input-with-icon">
-                      <span className="icon"><IconeBusca /></span>
-                      <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." />
-                    </div>
+                    <div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar fornecedor..." /></div>
                 </div>
                 <div className="list-container">
-                    {fornecedoresFiltrados.map(f => (
+                    {filtered.map(f => (
                         <div key={f.id} className="list-item">
                             <div className="list-item-info">
                                 <p><strong>{f.nome}</strong></p>
@@ -626,8 +755,8 @@ GERENCIAR_FORNECEDORES_JS_CONTENT = textwrap.dedent("""
                                 {f.observacoes && <p className='sub-text'>Obs: {f.observacoes}</p>}
                             </div>
                             <div className="list-item-actions">
-                                <button className="button-icon" onClick={() => handleEditar(f)}><IconeEditar /></button>
-                                <button className="button-icon" onClick={() => handleDelete(f.id)}><IconeLixeira /></button>
+                                <button className="button-icon" onClick={() => handleEdit(f)} aria-label={`Editar ${f.nome}`}><IconeEditar /></button>
+                                <button className="button-icon" onClick={() => handleDelete(f.id)} aria-label={`Excluir ${f.nome}`}><IconeLixeira /></button>
                             </div>
                         </div>
                     ))}
@@ -635,14 +764,13 @@ GERENCIAR_FORNECEDORES_JS_CONTENT = textwrap.dedent("""
             </div>
         );
     };
-
     export default GerenciarFornecedores;
 """)
 
 AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
     import React, { createContext, useState, useEffect, useContext } from 'react';
     import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-    import { doc, getDoc, setDoc } from "firebase/firestore";
+    import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
     import { auth, db } from '../firebase';
 
     const AuthContext = createContext();
@@ -650,20 +778,27 @@ AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
     export const AuthProvider = ({ children }) => {
         const [user, setUser] = useState(null);
         const [userRole, setUserRole] = useState(null);
+        const [userProfile, setUserProfile] = useState(null);
         const [loadingAuth, setLoadingAuth] = useState(true);
 
         useEffect(() => {
             const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
                 if (currentUser) {
-                    setUser(currentUser);
                     const userDocRef = doc(db, "users", currentUser.uid);
                     const userDocSnap = await getDoc(userDocRef);
                     if (userDocSnap.exists()) {
-                        setUserRole(userDocSnap.data().role);
+                        setUser(currentUser);
+                        const data = userDocSnap.data();
+                        setUserRole(data.role);
+                        setUserProfile(data);
+                    } else {
+                        // Se o doc não existe no Firestore, desloga para segurança
+                        await signOut(auth);
                     }
                 } else {
                     setUser(null);
                     setUserRole(null);
+                    setUserProfile(null);
                 }
                 setLoadingAuth(false);
             });
@@ -672,21 +807,29 @@ AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
 
         const loginUser = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-        const registerUser = async (email, password, role = 'colaborador') => {
+        const registerUser = async (email, password, role) => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            await setDoc(doc(db, "users", user.uid), {
-                uid: user.uid,
-                email: user.email,
+            const newUser = userCredential.user;
+            const onboardingComplete = role === 'gestor' ? false : true;
+            await setDoc(doc(db, "users", newUser.uid), {
+                uid: newUser.uid,
+                email: newUser.email,
                 role: role,
-                criadoEm: new Date()
+                criadoEm: new Date(),
+                onboardingComplete: onboardingComplete
             });
             return userCredential;
+        };
+        
+        const updateOnboardingStatus = async (uid, status) => {
+            const userDocRef = doc(db, "users", uid);
+            await updateDoc(userDocRef, { onboardingComplete: status });
+            setUserProfile(prev => ({ ...prev, onboardingComplete: status }));
         };
 
         const logout = () => signOut(auth);
 
-        const value = { user, userRole, loadingAuth, loginUser, registerUser, logout };
+        const value = { user, userRole, userProfile, loadingAuth, loginUser, registerUser, logout, updateOnboardingStatus };
 
         return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
     };
@@ -696,52 +839,83 @@ AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
 
 DATA_CONTEXT_JS_CONTENT = textwrap.dedent("""
     import React, { createContext, useState, useEffect, useContext } from 'react';
-    import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-    import { db } from '../firebase';
-    import { useAuth } from './AuthContext';
+    import { collection, onSnapshot, query, orderBy, getDocs } from 'firebase/firestore';
+    import { db } from '../firebase'; // Importação corrigida
+    import { useAuth } from './Auth';
 
     const DataContext = createContext();
 
     export const DataProvider = ({ children }) => {
-        const { user, userRole } = useAuth();
+        const { user } = useAuth();
         const [fornecedores, setFornecedores] = useState([]);
         const [produtosDeCompra, setProdutosDeCompra] = useState([]);
-        const [insumos, setInsumos] = useState([]);
         const [produtos, setProdutos] = useState([]);
         const [allPedidos, setAllPedidos] = useState([]);
         const [loadingData, setLoadingData] = useState(true);
 
         useEffect(() => {
             if (!user) {
-                setFornecedores([]); setProdutosDeCompra([]); setInsumos([]);
-                setProdutos([]); setAllPedidos([]); setLoadingData(false);
+                // Limpa os dados ao deslogar
+                setFornecedores([]);
+                setProdutosDeCompra([]);
+                setProdutos([]);
+                setAllPedidos([]);
+                setLoadingData(false);
                 return;
             }
 
             setLoadingData(true);
-            const collectionsToFetch = [
-                { name: "fornecedores", setter: setFornecedores, orderByField: "nome" },
-                { name: "produtosDeCompra", setter: setProdutosDeCompra, orderByField: "nome" },
-                { name: "pedidosRealizados", setter: setAllPedidos, orderByField: "criadoEm", orderDirection: "desc" }
-            ];
 
-            if (userRole === 'gestor') {
-                collectionsToFetch.push({ name: "insumos", setter: setInsumos, orderByField: "nome" });
-                collectionsToFetch.push({ name: "produtosFinais", setter: setProdutos, orderByField: "nome" });
-            }
+            const unsubscribers = [];
             
-            const unsubscribers = collectionsToFetch.map(coll => 
-                onSnapshot(query(collection(db, coll.name), orderBy(coll.orderByField, coll.orderDirection || 'asc')), 
-                    (snapshot) => coll.setter(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))),
-                    (error) => console.error("Erro ao buscar coleção:", coll.name, error)
-                )
-            );
+            // Fornecedores
+            const qFornecedores = query(collection(db, "fornecedores"), orderBy("nome"));
+            unsubscribers.push(onSnapshot(qFornecedores, (snapshot) => {
+                setFornecedores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }));
+            
+            // Produtos de Compra (Insumos) com seu histórico de preços
+            const qProdutosCompra = query(collection(db, "produtosDeCompra"), orderBy("nome"));
+            unsubscribers.push(onSnapshot(qProdutosCompra, async (snapshot) => {
+                const itemsWithPrices = await Promise.all(snapshot.docs.map(async (doc) => {
+                    const item = { id: doc.id, ...doc.data() };
+                    const historicoRef = collection(db, "produtosDeCompra", doc.id, "historicoPrecos");
+                    const historicoSnapshot = await getDocs(query(historicoRef, orderBy("dataCompra", "desc")));
+                    
+                    item.historicoPrecos = historicoSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    
+                    if (item.historicoPrecos.length > 0) {
+                        const bestPriceRecord = [...item.historicoPrecos].sort((a, b) => a.precoPorUnidadeAnalise - b.precoPorUnidadeAnalise)[0];
+                        item.bestPrice = bestPriceRecord.precoPorUnidadeAnalise;
+                        item.bestPriceFornecedorId = bestPriceRecord.fornecedorId;
+                    } else {
+                        item.bestPrice = null;
+                        item.bestPriceFornecedorId = null;
+                    }
+                    return item;
+                }));
+                setProdutosDeCompra(itemsWithPrices);
+            }));
+
+            // Produtos Finais (Fichas Técnicas)
+            const qProdutosFinais = query(collection(db, "produtosFinais"), orderBy("nome"));
+            unsubscribers.push(onSnapshot(qProdutosFinais, (snapshot) => {
+                setProdutos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }));
+            
+            // Pedidos Realizados
+            const qPedidos = query(collection(db, "pedidosRealizados"), orderBy("criadoEm", "desc"));
+            unsubscribers.push(onSnapshot(qPedidos, (snapshot) => {
+                setAllPedidos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }));
             
             setLoadingData(false);
-            return () => unsubscribers.forEach(unsub => unsub());
-        }, [user, userRole]);
 
-        const value = { fornecedores, produtosDeCompra, insumos, produtos, allPedidos, loadingData };
+            // Cleanup
+            return () => unsubscribers.forEach(unsub => unsub());
+        }, [user]);
+
+        const value = { fornecedores, produtosDeCompra, produtos, allPedidos, loadingData };
         return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
     };
     export const useData = () => useContext(DataContext);
@@ -769,10 +943,7 @@ UI_CONTEXT_JS_CONTENT = textwrap.dedent("""
             closeConfirmationModal();
         };
 
-        const value = {
-            modal, showModal, closeModal,
-            confirmationModal, showConfirmationModal, closeConfirmationModal, handleConfirmAction
-        };
+        const value = { modal, showModal, closeModal, confirmationModal, showConfirmationModal, closeConfirmationModal, handleConfirmAction };
         
         return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
     };
@@ -783,7 +954,7 @@ UI_CONTEXT_JS_CONTENT = textwrap.dedent("""
 MODAL_JS_CONTENT = textwrap.dedent("""
     import React from 'react';
 
-    const Modal = ({ children, onConfirm, showCancel, onCancel, title, confirmText = "Fechar" }) => (
+    const Modal = ({ children, onConfirm, showCancel, onCancel, title, confirmText = "OK" }) => (
         <div className="modal-overlay">
             <div className="modal-content">
                 {title && <h2>{title}</h2>}
@@ -797,14 +968,13 @@ MODAL_JS_CONTENT = textwrap.dedent("""
             </div>
         </div>
     );
-
     export default Modal;
 """)
 
 DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
     import React, { useMemo } from 'react';
     import { useData } from '../../context/DataContext';
-    import { IconeGrafico } from '../../utils/icons';
+    import { IconeGrafico } from '../../utils/icons'; // Importação corrigida
     import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
     import { Bar, Line } from 'react-chartjs-2';
 
@@ -814,566 +984,767 @@ DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
         const { allPedidos, loadingData } = useData();
 
         const { barChartData, lineChartData } = useMemo(() => {
-            if (loadingData || allPedidos.length === 0) {
+            if (loadingData || !allPedidos || allPedidos.length === 0) {
                 return { barChartData: null, lineChartData: null };
             }
 
-            const gastosPorFornecedor = allPedidos.reduce((acc, pedido) => {
-                if(pedido.status === 'finalizado') {
-                    const nome = pedido.fornecedorNome || 'Sem Fornecedor';
-                    const valor = pedido.valorTotal || 0;
-                    acc[nome] = (acc[nome] || 0) + valor;
-                }
+            const gastosPorFornecedor = allPedidos.filter(p => p.status === 'finalizado' && p.valorTotal > 0).reduce((acc, p) => {
+                const nome = p.fornecedorNome || 'N/A';
+                acc[nome] = (acc[nome] || 0) + p.valorTotal;
                 return acc;
             }, {});
 
             const barData = {
                 labels: Object.keys(gastosPorFornecedor),
-                datasets: [{
-                    label: 'Gastos Totais por Fornecedor (R$)',
-                    data: Object.values(gastosPorFornecedor),
-                    backgroundColor: 'rgba(0, 51, 160, 0.6)',
-                }],
+                datasets: [{ label: 'Gastos Totais (R$)', data: Object.values(gastosPorFornecedor), backgroundColor: 'rgba(0, 51, 160, 0.6)' }],
             };
             
-            const gastosPorMes = allPedidos.reduce((acc, pedido) => {
-                if (pedido.status === 'finalizado' && pedido.criadoEm) {
-                    const mesAno = new Date(pedido.criadoEm.seconds * 1000).toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit' });
-                    const valor = pedido.valorTotal || 0;
-                    acc[mesAno] = (acc[mesAno] || 0) + valor;
-                }
+            const gastosPorMes = allPedidos.filter(p => p.status === 'finalizado' && p.criadoEm).reduce((acc, p) => {
+                const mesAno = new Date(p.criadoEm.seconds * 1000).toLocaleDateString('pt-BR', { year: '2-digit', month: 'short' });
+                acc[mesAno] = (acc[mesAno] || 0) + p.valorTotal;
                 return acc;
             }, {});
-
-            const sortedMonths = Object.keys(gastosPorMes).sort((a, b) => {
-                const [m1, y1] = a.split('/');
-                const [m2, y2] = b.split('/');
-                return new Date(`${y1}-${m1}-01`) - new Date(`${y2}-${m2}-01`);
-            });
+            
+            const sortedMonths = Object.keys(gastosPorMes).sort((a,b) => new Date('01 ' + a.replace('/',' ')) - new Date('01 ' + b.replace('/',' ')));
 
             const lineData = {
                 labels: sortedMonths,
-                datasets: [{
-                    label: 'Gastos Mensais (R$)',
-                    data: sortedMonths.map(mes => gastosPorMes[mes]),
-                    fill: false,
-                    borderColor: 'rgb(217, 48, 37)',
-                    tension: 0.1
-                }]
+                datasets: [{ label: 'Evolução de Gastos (R$)', data: sortedMonths.map(m => gastosPorMes[m]), borderColor: '#d93025', tension: 0.1 }]
             };
 
-            return { barChartData: barData, lineChartData: lineData };
+            return { barChartData, lineChartData };
         }, [allPedidos, loadingData]);
 
-        if (loadingData) {
-            return <div className="card"><h2>Carregando Dashboard...</h2></div>;
-        }
+        if (loadingData) return <div className="card"><h2>Carregando Dashboard...</h2></div>;
 
         return (
-            <div className="grid-responsive">
-                <div className="card">
-                    <h2><IconeGrafico /> Dashboard Gerencial</h2>
-                    <p>Visão geral do desempenho e custos do seu negócio.</p>
+            <div>
+                <div className="card"><h2><IconeGrafico /> Dashboard Gerencial</h2><p>Visão geral do desempenho e custos do seu negócio.</p></div>
+                <div className="grid-responsive">
+                    {barChartData && Object.keys(barChartData.labels).length > 0 ? (
+                        <div className="card"><h3>Gastos por Fornecedor</h3><div style={{ height: '300px' }}><Bar data={barChartData} options={{ maintainAspectRatio: false }} /></div></div>
+                    ) : <div className="card"><h3>Gastos por Fornecedor</h3><p>Nenhum dado de pedido finalizado com valor para exibir.</p></div>}
+                    
+                    {lineChartData && Object.keys(lineChartData.labels).length > 0 ? (
+                        <div className="card"><h3>Evolução de Gastos Mensais</h3><div style={{ height: '300px' }}><Line data={lineChartData} options={{ maintainAspectRatio: false }} /></div></div>
+                    ) : <div className="card"><h3>Evolução de Gastos Mensais</h3><p>Nenhum dado de pedido finalizado para exibir.</p></div>}
                 </div>
-                {barChartData && (
-                    <div className="card">
-                        <h3>Gastos por Fornecedor (Pedidos Finalizados)</h3>
-                        <div style={{ height: '400px', position: 'relative' }}>
-                            <Bar data={barChartData} options={{ maintainAspectRatio: false, responsive: true }} />
-                        </div>
-                    </div>
-                )}
-                {lineChartData && (
-                     <div className="card">
-                        <h3>Evolução de Gastos Mensais (Pedidos Finalizados)</h3>
-                        <div style={{ height: '400px', position: 'relative' }}>
-                            <Line data={lineChartData} options={{ maintainAspectRatio: false, responsive: true }} />
-                        </div>
-                    </div>
-                )}
             </div>
         );
     };
-
     export default DashboardView;
 """)
 
+# NOVO ARQUIVO/REESTRUTURADO: Agora é CatalogoView, unificando gerenc. de fornecedores e itens de compra
 CADASTROS_VIEW_JS_CONTENT = textwrap.dedent("""
-    import React from 'react'; 
-    import GerenciarFornecedores from './GerenciarFornecedores'; 
-    import GerenciarCatalogo from './GerenciarCatalogo';
-    export default () => (
-        <div className='grid-responsive'>
-            <GerenciarFornecedores />
-            <GerenciarCatalogo />
-        </div>
-    );
-""")
-
-GERENCIAR_CATALOGO_JS_CONTENT = textwrap.dedent("""
     import React, { useState, useMemo } from 'react';
     import { useUI } from '../../context/UIContext';
     import { useData } from '../../context/DataContext';
-    import { addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
-    import { IconeCatalogo, IconeBusca, IconeEditar, IconeLixeira } from '../../utils/icons';
+    import { addDocument, updateDocument, deleteDocument, addDocumentToSubcollection } from '../../services/firestoreService';
+    import { IconeCaminhao, IconeBusca, IconeEditar, IconeLixeira, IconeMais, IconeCatalogo } from '../../utils/icons';
+    import { formatarWhatsappParaLink, formatarWhatsappParaExibicao, formatarValorPreciso } from '../../utils/formatters';
+    import Modal from '../../components/ui/Modal'; // Para o mini-modal de novo fornecedor
 
-    const GerenciarCatalogo = () => {
-        const { showModal, showConfirmationModal } = useUI();
-        const { produtosDeCompra, fornecedores } = useData();
+    // Componente interno para adicionar/gerenciar um novo fornecedor (mini-modal)
+    const QuickAddFornecedorModal = ({ onClose, onFornecedorAdded }) => {
+        const [nome, setNome] = useState('');
+        const [whatsapp, setWhatsapp] = useState('');
+        const { showModal } = useUI();
 
-        const initialState = {
-            nome: '',
-            fornecedorId: '',
-            detalheCompra: {
-                tipoBase: 'peso',
-                unidadeCompra: '',
-                conteudo: '',
-                unidadeConteudo: 'kg',
-            },
+        const handleSave = async (e) => {
+            e.preventDefault();
+            const formattedNumber = formatarWhatsappParaLink(whatsapp);
+            if (!nome || !formattedNumber) {
+                showModal('Preencha o nome e um WhatsApp válido.');
+                return;
+            }
+            try {
+                const docRef = await addDocument("fornecedores", { nome, whatsapp: formattedNumber, observacoes: null });
+                showModal('Fornecedor salvo!');
+                onFornecedorAdded(docRef.id);
+                onClose();
+            } catch (error) {
+                showModal('Erro ao salvar: ' + error.message);
+            }
         };
 
-        const [editing, setEditing] = useState(null);
-        const [formState, setFormState] = useState(initialState);
-        const [busca, setBusca] = useState('');
+        return (
+            <Modal title="Novo Fornecedor" onConfirm={handleSave} showCancel={true} onCancel={onClose} confirmText="Salvar">
+                <form onSubmit={handleSave}>
+                    <div className="form-group"><label>Nome</label><input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome da empresa" required /></div>
+                    <div className="form-group"><label>WhatsApp</label><input type="text" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required /></div>
+                </form>
+            </Modal>
+        );
+    };
 
-        const produtosFiltrados = useMemo(() =>
-            produtosDeCompra.filter(p => p.nome.toLowerCase().includes(busca.toLowerCase())),
-            [produtosDeCompra, busca]
+
+    const CatalogoView = () => {
+        const { showModal, showConfirmationModal } = useUI();
+        const { fornecedores, produtosDeCompra } = useData();
+        const [activeTab, setActiveTab] = useState('fornecedores'); // 'fornecedores' ou 'itensDeCompra'
+        
+        // Estado para o formulário unificado de Insumos/Compras
+        const [insumoForm, setInsumoForm] = useState({
+            id: null, // Para edição
+            nome: '',
+            unidadeAnalise: 'kg',
+            fornecedorId: '',
+            dataCompra: new Date().toISOString().split('T')[0],
+            quantidadeComprada: '',
+            precoTotalNota: ''
+        });
+        const [isNewInsumo, setIsNewInsumo] = useState(false);
+        const [buscaInsumo, setBuscaInsumo] = useState('');
+        const [showQuickAddFornecedor, setShowQuickAddFornecedor] = useState(false);
+
+        // Fornecedores para a lista
+        const [buscaFornecedor, setBuscaFornecedor] = useState('');
+        const filteredFornecedores = useMemo(() =>
+            fornecedores.filter(f => f.nome.toLowerCase().includes(buscaFornecedor.toLowerCase())),
+            [fornecedores, buscaFornecedor]
         );
 
-        const handleFormChange = (e) => {
+        // Itens de Compra (Insumos) para a lista
+        const filteredItensDeCompra = useMemo(() => {
+            const products = Array.isArray(produtosDeCompra) ? produtosDeCompra : [];
+            return products.filter(p => p.nome.toLowerCase().includes(buscaInsumo.toLowerCase())).map(p => ({
+                ...p,
+                bestPriceFornecedorNome: p.bestPriceFornecedorId ? (fornecedores.find(f => f.id === p.bestPriceFornecedorId)?.nome || 'N/A') : null
+            }));
+        }, [produtosDeCompra, buscaInsumo, fornecedores]);
+
+
+        // --- Lógica do Super Cadastro (Insumos/Compras) ---
+        const handleInsumoFormChange = (e) => {
             const { name, value } = e.target;
-            if (name.startsWith("detalheCompra.")) {
-                const field = name.split('.')[1];
-                if (field === 'tipoBase') {
-                    const newUnit = value === 'peso' ? 'kg' : 'L';
-                    setFormState(prev => ({...prev, detalheCompra: {...prev.detalheCompra, tipoBase: value, unidadeConteudo: newUnit}}));
-                } else {
-                    setFormState(prev => ({...prev, detalheCompra: {...prev.detalheCompra, [field]: value}}));
-                }
+            setInsumoForm(prev => ({ ...prev, [name]: value }));
+        };
+
+        const handleInsumoNomeBlur = () => {
+            const existingInsumo = produtosDeCompra.find(p => p.nome.toLowerCase() === insumoForm.nome.toLowerCase());
+            if (existingInsumo) {
+                setInsumoForm(prev => ({ ...prev, id: existingInsumo.id, unidadeAnalise: existingInsumo.unidadeAnalise }));
+                setIsNewInsumo(false);
             } else {
-                setFormState(prev => ({ ...prev, [name]: value }));
+                setInsumoForm(prev => ({ ...prev, id: null }));
+                setIsNewInsumo(true);
             }
         };
 
-        const calcularMedidaPadrao = (detalhe) => {
-            const { tipoBase, conteudo, unidadeConteudo } = detalhe;
-            const valor = parseFloat(String(conteudo).replace(',', '.'));
-            if (isNaN(valor)) return null;
-
-            if (tipoBase === 'peso') return { valor: unidadeConteudo === 'kg' ? valor * 1000 : valor, unidade: 'g' };
-            if (tipoBase === 'volume') return { valor: unidadeConteudo === 'L' ? valor * 1000 : valor, unidade: 'ml' };
-            if (tipoBase === 'unidade') return { valor: valor, unidade: 'un' };
-            return null;
-        };
-
-        const handleSalvar = async (e) => {
+        const handleSaveInsumoOrPurchase = async (e) => {
             e.preventDefault();
-            const { nome, fornecedorId, detalheCompra } = formState;
-            if (!nome || !fornecedorId || !detalheCompra.unidadeCompra || !detalheCompra.conteudo) {
-                showModal("Preencha todos os campos obrigatórios do produto.");
+            const { nome, unidadeAnalise, fornecedorId, dataCompra, quantidadeComprada, precoTotalNota, id } = insumoForm;
+            const qtd = parseFloat(String(quantidadeComprada).replace(',', '.'));
+            const precoTotal = parseFloat(String(precoTotalNota).replace(',', '.'));
+
+            if (!nome || !unidadeAnalise || !fornecedorId || isNaN(qtd) || qtd <= 0 || isNaN(precoTotal) || precoTotal <= 0) {
+                showModal("Preencha todos os campos do insumo e da compra corretamente.");
                 return;
             }
-            const medidaPadrao = calcularMedidaPadrao(detalheCompra);
-            if (!medidaPadrao) {
-                showModal("Medida inválida. Verifique os valores de conteúdo.");
-                return;
-            }
-            const dataToSave = { nome, fornecedorId, detalheCompra, medidaPadrao };
 
             try {
-                if (editing) {
-                    await updateDocument("produtosDeCompra", editing.id, dataToSave);
-                    showModal("Produto atualizado!");
-                } else {
-                    await addDocument("produtosDeCompra", dataToSave);
-                    showModal("Produto salvo no catálogo!");
+                let currentInsumoId = id;
+                if (isNewInsumo || !currentInsumoId) {
+                    // Crie um novo documento de insumo se for um insumo novo
+                    const newInsumoRef = await addDocument("produtosDeCompra", { nome, unidadeAnalise });
+                    currentInsumoId = newInsumoRef.id;
+                    showModal("Novo insumo cadastrado!");
                 }
-                resetForm();
+
+                // Registrar a compra na subcoleção historicoPrecos
+                const precoPorUnidadeAnalise = precoTotal / qtd;
+                const purchaseRecord = {
+                    fornecedorId,
+                    dataCompra: new Date(dataCompra),
+                    precoTotalNota: precoTotal,
+                    quantidadeComprada: qtd,
+                    unidadeComprada: unidadeAnalise, // Unidade da compra é a unidade de análise
+                    precoPorUnidadeAnalise,
+                };
+                await addDocumentToSubcollection("produtosDeCompra", currentInsumoId, "historicoPrecos", purchaseRecord);
+                showModal(`Compra registrada para ${nome}! Custo: ${formatarValorPreciso(precoPorUnidadeAnalise)}/${unidadeAnalise}`);
+
+                resetInsumoForm();
             } catch (error) {
-                showModal("Erro ao salvar: " + error.message);
+                showModal("Erro ao salvar insumo/compra: " + error.message);
             }
         };
 
-        const handleEditar = (produto) => {
-            setEditing(produto);
-            setFormState({
-                nome: produto.nome,
-                fornecedorId: produto.fornecedorId,
-                detalheCompra: produto.detalheCompra
+        const resetInsumoForm = () => {
+            setInsumoForm({
+                id: null,
+                nome: '',
+                unidadeAnalise: 'kg',
+                fornecedorId: '',
+                dataCompra: new Date().toISOString().split('T')[0],
+                quantidadeComprada: '',
+                precoTotalNota: ''
             });
+            setIsNewInsumo(false);
         };
-        
-        const handleDelete = (id) => {
-             showConfirmationModal("Excluir este produto do catálogo?", async () => {
+
+        const handleEditInsumo = (insumo) => {
+            // Preenche o formulário para edição de insumo
+            setInsumoForm({
+                id: insumo.id,
+                nome: insumo.nome,
+                unidadeAnalise: insumo.unidadeAnalise,
+                fornecedorId: '', // Não preencher dados de compra aqui
+                dataCompra: new Date().toISOString().split('T')[0],
+                quantidadeComprada: '',
+                precoTotalNota: ''
+            });
+            setIsNewInsumo(false); // É um insumo existente
+            setActiveTab('itensDeCompra'); // Ir para a aba do formulário
+        };
+
+        const handleDeleteInsumo = (id) => {
+            showConfirmationModal("Excluir este item de compra e todo seu histórico de preços?", async () => {
                 try {
                     await deleteDocument("produtosDeCompra", id);
-                    showModal("Produto excluído.");
+                    showModal("Item de compra excluído.");
                 } catch (error) {
                     showModal("Erro ao excluir: " + error.message);
                 }
             });
         };
-
-        const resetForm = () => { setEditing(null); setFormState(initialState); };
         
-        const formatarDetalheCompraParaExibicao = (detalhe) => {
-            if (!detalhe || !detalhe.unidadeCompra) return '';
-            return `${detalhe.unidadeCompra} de ${detalhe.conteudo} ${detalhe.unidadeConteudo || ''}`;
-        };
-
+        // --- Renderização ---
         return (
-            <div className="card">
-                <h2><IconeCatalogo /> Gerenciar Catálogo de Compra</h2>
-                <form onSubmit={handleSalvar}>
-                    <div className="form-group"><label>Nome do Produto no Catálogo</label><input name="nome" type="text" value={formState.nome} onChange={handleFormChange} placeholder="Ex: Queijo Mussarela Peça" required /></div>
-                    <div className="form-group"><label>Como o produto é medido?</label><select name="detalheCompra.tipoBase" value={formState.detalheCompra.tipoBase} onChange={handleFormChange}><option value="peso">Por Peso (g, kg)</option><option value="volume">Por Volume (ml, L)</option><option value="unidade">Por Unidade (un, cx, pct)</option></select></div>
-                    <div className="form-group-inline">
-                        <div className="form-group"><label>Forma de Compra</label><input name="detalheCompra.unidadeCompra" type="text" value={formState.detalheCompra.unidadeCompra} onChange={handleFormChange} placeholder="Ex: Peça, Caixa" required /></div>
-                        {(formState.detalheCompra.tipoBase === 'peso' || formState.detalheCompra.tipoBase === 'volume') && (<><div className="form-group"><label>Quantidade</label><input name="detalheCompra.conteudo" type="text" value={formState.detalheCompra.conteudo} onChange={handleFormChange} placeholder="Ex: 2.5" required /></div><div className="form-group"><label>Medida</label><select name="detalheCompra.unidadeConteudo" value={formState.detalheCompra.unidadeConteudo} onChange={handleFormChange}>{formState.detalheCompra.tipoBase === 'peso' ? (<><option value="kg">kg</option><option value="g">g</option></>) : (<><option value="L">L</option><option value="ml">ml</option></>)}</select></div></>)}
-                        {formState.detalheCompra.tipoBase === 'unidade' && (<div className="form-group"><label>Nº de Itens</label><input name="detalheCompra.conteudo" type="number" value={formState.detalheCompra.conteudo} onChange={handleFormChange} placeholder="Ex: 12" required /></div>)}
-                    </div>
-                    <div className="form-group"><label>Fornecedor Padrão</label><select name="fornecedorId" value={formState.fornecedorId} onChange={handleFormChange} required><option value="">Selecione...</option>{fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></div>
-                    <button type="submit" className="button-primary">{editing ? 'Atualizar Produto' : 'Salvar Novo Produto'}</button>
-                    {editing && <button type="button" onClick={resetForm} className="button-link">Cancelar</button>}
-                </form>
-                <div className="divider" />
-                <div className="form-group"><label>Buscar Produto</label><div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Digite para buscar..." /></div></div>
-                <div className="list-container">
-                    {produtosFiltrados.map(p => (
-                        <div key={p.id} className="list-item">
-                            <div className="list-item-info">
-                                <p><strong>{p.nome}</strong></p>
-                                <p className="sub-text">Detalhe: {formatarDetalheCompraParaExibicao(p.detalheCompra)}</p>
-                                <p className="sub-text">Padrão: {p.medidaPadrao.valor}{p.medidaPadrao.unidade}</p>
-                                <p className="sub-text">Fornecedor: {fornecedores.find(f => f.id === p.fornecedorId)?.nome || 'N/A'}</p>
+            <div>
+                <div className="card">
+                    <h2><IconeCatalogo /> Catálogo de Itens e Fornecedores</h2>
+                    <p>Gerencie seus fornecedores e todos os insumos que você compra. Para cada insumo, registre as compras para que o sistema saiba o custo por unidade.</p>
+                </div>
+
+                {/* Seção de Registro de Nova Compra / Cadastro de Insumo */}
+                <div className="card">
+                    <h3>Registrar Nova Compra / Cadastrar Insumo</h3>
+                    <form onSubmit={handleSaveInsumoOrPurchase}>
+                        <div className="form-group">
+                            <label>Nome do Insumo</label>
+                            <input
+                                name="nome"
+                                type="text"
+                                value={insumoForm.nome}
+                                onChange={handleInsumoFormChange}
+                                onBlur={handleInsumoNomeBlur}
+                                placeholder="Ex: Farinha de Trigo, Leite"
+                                required
+                            />
+                        </div>
+
+                        {isNewInsumo && (
+                            <div className="form-group">
+                                <label>Unidade para Análise de Custo</label>
+                                <select
+                                    name="unidadeAnalise"
+                                    value={insumoForm.unidadeAnalise}
+                                    onChange={handleInsumoFormChange}
+                                    required
+                                >
+                                    <option value="kg">Quilograma (kg)</option>
+                                    <option value="L">Litro (L)</option>
+                                    <option value="un">Unidade (un)</option>
+                                </select>
                             </div>
-                            <div className="list-item-actions">
-                                <button className="button-icon" onClick={() => handleEditar(p)}><IconeEditar /></button>
-                                <button className="button-icon" onClick={() => handleDelete(p.id)}><IconeLixeira /></button>
+                        )}
+
+                        <div className="form-group">
+                            <label>Fornecedor
+                                <button type="button" className="button-link" onClick={() => setShowQuickAddFornecedor(true)} style={{marginLeft: '0.5rem', fontSize: '0.9rem'}}>
+                                    + Novo Fornecedor
+                                </button>
+                            </label>
+                            <select
+                                name="fornecedorId"
+                                value={insumoForm.fornecedorId}
+                                onChange={handleInsumoFormChange}
+                                required
+                            >
+                                <option value="">Selecione um fornecedor...</option>
+                                {fornecedores.map(f => (
+                                    <option key={f.id} value={f.id}>{f.nome}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="form-group">
+                            <label>Data da Compra</label>
+                            <input
+                                name="dataCompra"
+                                type="date"
+                                value={insumoForm.dataCompra}
+                                onChange={handleInsumoFormChange}
+                                required
+                            />
+                        </div>
+
+                        <div className="form-group-inline">
+                            <div className="form-group">
+                                <label>Quantidade Comprada ({insumoForm.unidadeAnalise})</label>
+                                <input
+                                    name="quantidadeComprada"
+                                    type="text"
+                                    value={insumoForm.quantidadeComprada}
+                                    onChange={handleInsumoFormChange}
+                                    placeholder={`Ex: 25 (${insumoForm.unidadeAnalise})`}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Preço Total na Nota (R$)</label>
+                                <input
+                                    name="precoTotalNota"
+                                    type="text"
+                                    value={insumoForm.precoTotalNota}
+                                    onChange={handleInsumoFormChange}
+                                    placeholder="Ex: 120.00"
+                                    required
+                                />
                             </div>
                         </div>
-                    ))}
+
+                        {insumoForm.quantidadeComprada && insumoForm.precoTotalNota && !isNaN(parseFloat(insumoForm.quantidadeComprada)) && !isNaN(parseFloat(insumoForm.precoTotalNota)) && (
+                            <p style={{textAlign: 'center', fontWeight: 'bold', marginTop: '1rem'}}>
+                                Custo por {insumoForm.unidadeAnalise}: {formatarValorPreciso(parseFloat(insumoForm.precoTotalNota) / parseFloat(insumoForm.quantidadeComprada))}
+                            </p>
+                        )}
+
+                        <button type="submit" className="button-primary">
+                            {insumoForm.id ? 'Registrar Nova Compra' : 'Cadastrar Insumo e Registrar Compra'}
+                        </button>
+                        {insumoForm.id && <button type="button" onClick={resetInsumoForm} className="button-link">Limpar Formulário</button>}
+                    </form>
                 </div>
+
+                {showQuickAddFornecedor && (
+                    <QuickAddFornecedorModal
+                        onClose={() => setShowQuickAddFornecedor(false)}
+                        onFornecedorAdded={(id) => setInsumoForm(prev => ({ ...prev, fornecedorId: id }))}
+                    />
+                )}
+
+                <div className="divider" />
+
+                {/* Tabs de visualização */}
+                <div className="variantes-tabs"> {/* Reutilizando a classe de tabs */}
+                    <button className={activeTab === 'fornecedores' ? 'active' : ''} onClick={() => setActiveTab('fornecedores')}>
+                        Lista de Fornecedores
+                    </button>
+                    <button className={activeTab === 'itensDeCompra' ? 'active' : ''} onClick={() => setActiveTab('itensDeCompra')}>
+                        Lista de Insumos
+                    </button>
+                </div>
+
+                {/* Conteúdo das Tabs */}
+                {activeTab === 'fornecedores' && (
+                    <div className="card">
+                        <h3><IconeCaminhao /> Seus Fornecedores</h3>
+                        <div className="form-group">
+                            <div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={buscaFornecedor} onChange={e => setBuscaFornecedor(e.target.value)} placeholder="Buscar fornecedor..." /></div>
+                        </div>
+                        <div className="list-container">
+                            {filteredFornecedores.length > 0 ? filteredFornecedores.map(f => (
+                                <div key={f.id} className="list-item">
+                                    <div className="list-item-info">
+                                        <p><strong>{f.nome}</strong></p>
+                                        <a href={`https://wa.me/${f.whatsapp}`} target="_blank" rel="noopener noreferrer">{formatarWhatsappParaExibicao(f.whatsapp)}</a>
+                                        {f.observacoes && <p className='sub-text'>Obs: {f.observacoes}</p>}
+                                    </div>
+                                    <div className="list-item-actions">
+                                        <button className="button-icon" onClick={() => { /* Implementar edição de fornecedor direto na lista se necessário */ }} aria-label={`Editar ${f.nome}`}><IconeEditar /></button>
+                                        <button className="button-icon" onClick={() => { /* Implementar exclusão de fornecedor direto na lista se necessário */ }} aria-label={`Excluir ${f.nome}`}><IconeLixeira /></button>
+                                    </div>
+                                </div>
+                            )) : <p className="sub-text">Nenhum fornecedor cadastrado.</p>}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'itensDeCompra' && (
+                    <div className="card">
+                        <h3><IconeCatalogo /> Seus Insumos Cadastrados</h3>
+                        <div className="form-group">
+                            <div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={buscaInsumo} onChange={e => setBuscaInsumo(e.target.value)} placeholder="Buscar insumo..." /></div>
+                        </div>
+                        <div className="list-container">
+                            {filteredItensDeCompra.length > 0 ? filteredItensDeCompra.map(p => (
+                                <div key={p.id} className="list-item">
+                                    <div className="list-item-info">
+                                        <p><strong>{p.nome}</strong> (Análise p/ {p.unidadeAnalise})</p>
+                                        {p.bestPrice ? (
+                                            <p className="sub-text" style={{color: 'var(--cor-sucesso)'}}>Melhor Preço: <strong>{formatarValorPreciso(p.bestPrice)}/{p.unidadeAnalise}</strong> ({p.bestPriceFornecedorNome})</p>
+                                        ) : <p className="sub-text">Nenhum custo registrado.</p>}
+                                    </div>
+                                    <div className="list-item-actions">
+                                        <button className="button-icon" onClick={() => {
+                                            // Preencher o formulário principal com o insumo para registrar nova compra
+                                            setInsumoForm(prev => ({ 
+                                                ...prev, 
+                                                id: p.id, 
+                                                nome: p.nome, 
+                                                unidadeAnalise: p.unidadeAnalise,
+                                                fornecedorId: p.bestPriceFornecedorId || '' // Sugere o último fornecedor usado
+                                            }));
+                                            setIsNewInsumo(false);
+                                            // Scroll para o topo para o formulário
+                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                        }} aria-label={`Registrar nova compra para ${p.nome}`}><IconeMais/></button>
+                                        <button className="button-icon" onClick={() => handleDeleteInsumo(p.id)} aria-label={`Excluir item ${p.nome}`}><IconeLixeira /></button>
+                                    </div>
+                                </div>
+                            )) : <p className="sub-text">Nenhum insumo cadastrado.</p>}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
-    export default GerenciarCatalogo;
+
+    export default CatalogoView;
 """)
 
+# Removido: GerenciarItensDeCompra, sua lógica foi integrada em CatalogoView.js
+GERENCIAR_CATALOGO_JS_CONTENT = textwrap.dedent("""
+    // Este arquivo foi removido/integrado no CatalogoView.js para simplificar o fluxo de cadastro.
+    // Sua lógica foi migrada para src/features/cadastros/CatalogoView.js.
+""")
+
+# Removido: GerenciarFornecedores, sua lógica foi integrada em CatalogoView.js
+GERENCIAR_FORNECEDORES_JS_CONTENT = textwrap.dedent("""
+    // Este arquivo foi removido/integrado no CatalogoView.js para simplificar o fluxo de cadastro.
+    // Sua lógica foi migrada para src/features/cadastros/CatalogoView.js.
+""")
+
+
+REGISTRAR_COMPRA_MODAL_JS_CONTENT = textwrap.dedent("""
+    import React, { useState } from 'react';
+    import Modal from '../../components/ui/Modal';
+    import { useData } from '../../context/DataContext'; # Importação corrigida
+    import { useUI } from '../../context/UIContext';
+    import { addDocumentToSubcollection } from '../../services/firestoreService';
+    import { formatarValorPreciso } from '../../utils/formatters';
+
+    const RegistrarCompraModal = ({ item, onClose }) => {
+        const { fornecedores } = useData();
+        const { showModal } = useUI();
+        const [fornecedorId, setFornecedorId] = useState('');
+        const [dataCompra, setDataCompra] = useState(new Date().toISOString().split('T')[0]);
+        const [quantidadeComprada, setQuantidadeComprada] = useState('');
+        const [precoTotalNota, setPrecoTotalNota] = useState('');
+
+        const handleRegister = async (e) => {
+            e.preventDefault();
+            const qtd = parseFloat(String(quantidadeComprada).replace(',', '.'));
+            const precoTotal = parseFloat(String(precoTotalNota).replace(',', '.'));
+            if (!fornecedorId || isNaN(qtd) || qtd <= 0 || isNaN(precoTotal) || precoTotal <= 0) {
+                showModal("Preencha todos os campos corretamente."); return;
+            }
+            const precoPorUnidadeAnalise = precoTotal / qtd;
+            const purchaseRecord = {
+                fornecedorId,
+                dataCompra: new Date(dataCompra),
+                precoTotalNota: precoTotal,
+                quantidadeComprada: qtd,
+                unidadeComprada: item.unidadeAnalise, // Unidade da compra é a unidade de análise
+                precoPorUnidadeAnalise,
+            };
+            try {
+                await addDocumentToSubcollection("produtosDeCompra", item.id, "historicoPrecos", purchaseRecord);
+                showModal(`Compra registrada! Novo custo por ${item.unidadeAnalise}: ${formatarValorPreciso(precoPorUnidadeAnalise)}`);
+                onClose();
+            } catch (error) { showModal("Erro ao registrar compra: " + error.message); }
+        };
+
+        return (
+            <Modal title={`Registrar Compra: "${item.nome}"`} onConfirm={handleRegister} showCancel={true} onCancel={onClose} confirmText="Registrar">
+                <form onSubmit={handleRegister}>
+                    <div className="form-group">
+                        <label>Fornecedor</label>
+                        <select value={fornecedorId} onChange={e => setFornecedorId(e.target.value)} required aria-label="Selecione o fornecedor">
+                            <option value="">Selecione...</option>
+                            {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group-inline">
+                        <div className="form-group">
+                            <label>Qtd. Comprada ({item.unidadeAnalise})</label>
+                            <input type="text" value={quantidadeComprada} onChange={e => setQuantidadeComprada(e.target.value)} required aria-label={`Quantidade comprada em ${item.unidadeAnalise}`}/>
+                        </div>
+                        <div className="form-group">
+                            <label>Preço Total da Nota (R$)</label>
+                            <input type="text" value={precoTotalNota} onChange={e => setPrecoTotalNota(e.target.value)} required aria-label="Preço total na nota fiscal"/>
+                        </div>
+                    </div>
+                    <div className="form-group"><label>Data da Compra</label><input type="date" value={dataCompra} onChange={e => setDataCompra(e.target.value)} required /></div>
+                    {quantidadeComprada && precoTotalNota && !isNaN(parseFloat(quantidadeComprada)) && !isNaN(parseFloat(precoTotalNota)) && (
+                        <p style={{textAlign: 'center', fontWeight: 'bold'}}>Custo por {item.unidadeAnalise}: {formatarValorPreciso(parseFloat(precoTotalNota)/parseFloat(quantidadeComprada))}</p>
+                    )}
+                </form>
+            </Modal>
+        );
+    };
+    export default RegistrarCompraModal;
+""")
+
+COMPARATIVE_PRICES_MODAL_JS_CONTENT = textwrap.dedent("""
+    import React, { useMemo } from 'react';
+    import Modal from '../../components/ui/Modal';
+    import { useData } from '../../context/DataContext';
+    import { formatarValorPreciso, formatarData } from '../../utils/formatters';
+
+    const ComparativePricesModal = ({ item, onSelectPrice, onClose }) => {
+        const { fornecedores } = useData();
+
+        const pricesBySupplier = useMemo(() => {
+            if (!item?.historicoPrecos) return [];
+            const latestPrices = {};
+            // Pega o preço mais recente de cada fornecedor
+            item.historicoPrecos.forEach(rec => {
+                if (!latestPrices[rec.fornecedorId] || rec.dataCompra.seconds > latestPrices[rec.fornecedorId].dataCompra.seconds) {
+                    latestPrices[rec.fornecedorId] = rec;
+                }
+            });
+            return Object.values(latestPrices)
+                .map(rec => ({ ...rec, fornecedorNome: fornecedores.find(f => f.id === rec.fornecedorId)?.nome || 'N/A' }))
+                .sort((a, b) => a.precoPorUnidadeAnalise - b.precoPorUnidadeAnalise);
+        }, [item, fornecedores]);
+
+        return (
+            <Modal title={`Preços para: "${item.nome}"`} onConfirm={onClose} confirmText="Fechar">
+                <div className="list-container" style={{maxHeight: '300px'}}>
+                    {pricesBySupplier.length > 0 ? pricesBySupplier.map(price => (
+                        <div key={price.id} className="list-item">
+                            <div>
+                                <p><strong>{price.fornecedorNome}</strong></p>
+                                <p className="sub-text">Última compra: {formatarData(price.dataCompra)}</p>
+                            </div>
+                            <div style={{textAlign: 'right'}}>
+                                <p><strong>{formatarValorPreciso(price.precoPorUnidadeAnalise)}/{item.unidadeAnalise}</strong></p>
+                                <button type="button" className="button-primary" style={{padding: '0.3rem 0.6rem', fontSize: '0.8rem'}} onClick={() => onSelectPrice(price)}>Selecionar</button>
+                            </div>
+                        </div>
+                    )) : <p className="sub-text">Nenhum histórico de compra para este item.</p>}
+                </div>
+            </Modal>
+        );
+    };
+    export default ComparativePricesModal;
+""")
+
+# REESTRUTURADO: Foco apenas em gerenciar produtos finais (fichas técnicas)
 CMV_VIEW_JS_CONTENT = textwrap.dedent("""
     import React, { useState, useMemo } from 'react';
     import { useData } from '../../context/DataContext';
     import { useUI } from '../../context/UIContext';
-    import { setDocument, incrementField, addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
-    import { IconeCmv, IconeFichaTecnica, IconeEditar, IconeLixeira, IconeSalvar } from '../../utils/icons';
+    import { addDocument, updateDocument, deleteDocument } from '../../services/firestoreService';
+    import { IconeFichaTecnica, IconeEditar, IconeLixeira } from '../../utils/icons';
     import { formatarValor, formatarValorPreciso } from '../../utils/formatters';
-    
-    const RegistrarCompra = () => {
-        const { produtosDeCompra, allPedidos } = useData();
-        const { showModal } = useUI();
-        const [selectedProdutoId, setSelectedProdutoId] = useState('');
-        const [valorNota, setValorNota] = useState('');
-        const [pedidoVinculadoId, setPedidoVinculadoId] = useState('');
-
-        const handleUpdateInsumoCost = async (e) => {
-            e.preventDefault();
-            const produtoSelecionado = produtosDeCompra.find(p => p.id === selectedProdutoId);
-            const valor = parseFloat(String(valorNota).replace(',', '.'));
-
-            if (!produtoSelecionado || isNaN(valor) || valor <= 0) {
-                showModal("Selecione um produto e insira um valor de nota válido.");
-                return;
-            }
-            
-            const { medidaPadrao } = produtoSelecionado;
-            if (!medidaPadrao || !medidaPadrao.valor) {
-                showModal("O produto selecionado não tem uma medida padrão calculada. Verifique o cadastro.");
-                return;
-            }
-
-            const precoFinal = valor / medidaPadrao.valor;
-
-            const insumoData = {
-                nome: produtoSelecionado.nome,
-                fornecedorId: produtoSelecionado.fornecedorId,
-                preco_por_unidade_padrao: precoFinal,
-                unidade_padrao: medidaPadrao.unidade,
-                ultima_compra_desc: `Nota de R$ ${valor.toFixed(2)} para ${medidaPadrao.valor}${medidaPadrao.unidade}`,
-            };
-
-            try {
-                await setDocument("insumos", produtoSelecionado.id, insumoData);
-                await incrementField("insumos", produtoSelecionado.id, "estoqueAtual", medidaPadrao.valor);
-                
-                if (pedidoVinculadoId) {
-                    await updateDocument("pedidosRealizados", pedidoVinculadoId, {
-                        valorTotal: valor,
-                        status: 'finalizado'
-                    });
-                }
-                
-                showModal(`Custo atualizado e estoque incrementado! Novo custo: ${formatarValorPreciso(precoFinal)}/${medidaPadrao.unidade}.`);
-                setSelectedProdutoId('');
-                setValorNota('');
-                setPedidoVinculadoId('');
-            } catch (error) {
-                showModal("Erro ao atualizar custo: " + error.message);
-            }
-        };
         
-        const pedidosPendentes = useMemo(() => allPedidos.filter(p => p.status === 'enviado'), [allPedidos]);
-
-        return (
-            <div className="card">
-                <h2><IconeSalvar /> Registrar Compra e Fechar Ciclo</h2>
-                <form onSubmit={handleUpdateInsumoCost}>
-                    <div className="form-group">
-                        <label>1. Selecione o item do Catálogo</label>
-                        <select value={selectedProdutoId} onChange={e => setSelectedProdutoId(e.target.value)} required>
-                            <option value="">Selecione um produto...</option>
-                            {produtosDeCompra.map(p => (
-                                <option key={p.id} value={p.id}>{p.nome} ({p.detalheCompra.unidadeCompra})</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label>2. Valor Total da Nota Fiscal (R$)</label>
-                        <input type="text" value={valorNota} onChange={e => setValorNota(e.target.value)} placeholder="Ex: 150,25" required />
-                    </div>
-                    <div className="form-group">
-                        <label>3. Vincular a um Pedido Enviado (Opcional)</label>
-                         <select value={pedidoVinculadoId} onChange={e => setPedidoVinculadoId(e.target.value)}>
-                            <option value="">Não vincular</option>
-                            {pedidosPendentes.map(p => (
-                                <option key={p.id} value={p.id}>
-                                    Pedido para {p.fornecedorNome} em {new Date(p.criadoEm.seconds * 1000).toLocaleDateString()}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <button type="submit" className="button-primary">Calcular Custo e Adicionar ao Estoque</button>
-                </form>
-            </div>
-        );
-    };
- 
-    const GerenciarProdutosFinais = () => {
-        const { insumos, produtos } = useData();
+    const GerenciarProdutosFinais = ({ isDisabled }) => {
+        const { produtosDeCompra, produtos } = useData();
         const { showModal, showConfirmationModal } = useUI();
-
-        const initialState = {
-            nome: '',
-            categoria: '',
-            variantes: [{ nomeVariante: 'Padrão', custoEmbalagem: '', custoOperacional: '', fichaTecnica: [] }]
-        };
-
-        const [editingProduto, setEditingProduto] = useState(null);
+        const initialState = { nome: '', categoria: '', variantes: [{ nomeVariante: 'Padrão', custoEmbalagem: '', custoOperacional: '', fichaTecnica: [] }] };
         const [formState, setFormState] = useState(initialState);
+        const [editing, setEditing] = useState(null);
         const [varianteAtiva, setVarianteAtiva] = useState(0);
-        const [insumoFicha, setInsumoFicha] = useState('');
-        const [qtdInsumoFicha, setQtdInsumoFicha] = useState('');
+        const [selectedInsumoId, setSelectedInsumoId] = useState('');
+        const [qtdInsumo, setQtdInsumo] = useState('');
         const [margemLucro, setMargemLucro] = useState(200);
 
-        const resetForm = () => {
-            setEditingProduto(null);
-            setFormState(initialState);
-            setVarianteAtiva(0);
-        };
+        // Obter o insumo selecionado para acessar suas propriedades
+        const selectedInsumo = useMemo(() => {
+            return produtosDeCompra.find(p => p.id === selectedInsumoId);
+        }, [selectedInsumoId, produtosDeCompra]);
+
+        const resetForm = () => { setEditing(null); setFormState(initialState); setVarianteAtiva(0); };
         
-        const handleSalvarProdutoFinal = async (e) => {
+        const handleSave = async (e) => {
             e.preventDefault();
-            if (!formState.nome) {
-                showModal("O nome do produto é obrigatório.");
-                return;
-            }
-
+            if (!formState.nome) { showModal("O nome do produto é obrigatório."); return; }
             try {
-                const variantesCalculadas = formState.variantes.map(variante => {
-                    let custoTotalInsumos = 0;
-                    const fichaTecnicaCalculada = variante.fichaTecnica.map(item => {
-                        const insumoDetalhe = insumos.find(i => i.id === item.insumoId);
-                        if (!insumoDetalhe) throw new Error(`Insumo "${item.nome}" não encontrado.`);
-                        const custoItem = item.quantidade * insumoDetalhe.preco_por_unidade_padrao;
-                        custoTotalInsumos += custoItem;
-                        return { ...item, custo: custoItem };
-                    });
-
-                    const custoEmbalagem = parseFloat(String(variante.custoEmbalagem || '0').replace(',', '.'));
-                    const custoOperacional = parseFloat(String(variante.custoOperacional || '0').replace(',', '.'));
-                    const cmvCalculado = custoTotalInsumos + custoEmbalagem + custoOperacional;
-
-                    return { ...variante, fichaTecnica: fichaTecnicaCalculada, cmvCalculado };
-                });
-
                 const produtoData = {
-                    nome: formState.nome,
-                    categoria: formState.categoria || 'Sem Categoria',
-                    variantes: variantesCalculadas
+                    ...formState,
+                    variantes: formState.variantes.map(v => {
+                        const custoTotalItens = v.fichaTecnica.reduce((acc, item) => acc + item.custo, 0);
+                        const custoEmbalagem = parseFloat(String(v.custoEmbalagem || '0').replace(',', '.'));
+                        const custoOperacional = parseFloat(String(v.custoOperacional || '0').replace(',', '.'));
+                        const cmvCalculado = custoTotalItens + custoEmbalagem + custoOperacional;
+                        return { ...v, cmvCalculado };
+                    })
                 };
-
-                if (editingProduto) {
-                    await updateDocument("produtosFinais", editingProduto.id, produtoData);
-                    showModal("Produto atualizado com sucesso!");
+                if (editing) {
+                    await updateDocument("produtosFinais", editing.id, produtoData);
+                    showModal("Produto atualizado!");
                 } else {
                     await addDocument("produtosFinais", produtoData);
-                    showModal("Produto final salvo com sucesso!");
+                    showModal("Produto salvo!");
                 }
                 resetForm();
-            } catch (error) {
-                showModal("Erro ao salvar produto: " + error.message);
-            }
+            } catch (error) { showModal("Erro ao salvar: " + error.message); }
         };
         
-        const handleAdicionarItemFicha = () => {
-            const insumo = insumos.find(i => i.id === insumoFicha);
-            const quantidade = parseFloat(String(qtdInsumoFicha).replace(',', '.'));
-            if (!insumo || isNaN(quantidade) || quantidade <= 0) {
-                showModal("Selecione um insumo e quantidade válida.");
-                return;
+        const handleAddItem = () => {
+            const insumo = produtosDeCompra.find(p => p.id === selectedInsumoId);
+            const qtd = parseFloat(String(qtdInsumo).replace(',', '.'));
+            if (!insumo || isNaN(qtd) || qtd <= 0 || !insumo.bestPrice) {
+                showModal("Selecione um insumo com preço e quantidade válidos."); return;
             }
             
-            const novasVariantes = [...formState.variantes];
-            novasVariantes[varianteAtiva].fichaTecnica.push({
-                insumoId: insumo.id,
+            // Determina a unidade de exibição e o fator de conversão
+            let displayUnit = insumo.unidadeAnalise;
+            let conversionFactor = 1;
+
+            if (insumo.unidadeAnalise === 'kg') {
+                displayUnit = 'g';
+                conversionFactor = 1000; // 1 kg = 1000 g
+            } else if (insumo.unidadeAnalise === 'L') {
+                displayUnit = 'ml';
+                conversionFactor = 1000; // 1 L = 1000 ml
+            }
+            // A quantidade de entrada (qtd) é na unidade de exibição (g, ml, un)
+            // O custo do insumo é por unidade de análise (R$/kg, R$/L, R$/un)
+            // Portanto, para calcular o custo, convertemos a quantidade de volta para a unidade de análise
+            const quantidadeEmUnidadeAnalise = qtd / conversionFactor;
+
+            const novoItem = {
+                itemDeCompraId: insumo.id,
                 nome: insumo.nome,
-                quantidade: quantidade,
-                unidade: insumo.unidade_padrao
-            });
+                quantidade: qtd, // Quantidade na unidade de exibição (g, ml, un)
+                unidade: displayUnit, // Unidade para exibição na ficha (g, ml, un)
+                custo: quantidadeEmUnidadeAnalise * insumo.bestPrice, // Custo calculado
+            };
+            const novasVariantes = [...formState.variantes];
+            novasVariantes[varianteAtiva].fichaTecnica.push(novoItem);
             setFormState({...formState, variantes: novasVariantes });
-            setInsumoFicha('');
-            setQtdInsumoFicha('');
+            setSelectedInsumoId(''); setQtdInsumo('');
         };
 
-        const handleRemoverItemFicha = (itemIndex) => {
+        const handleRemoveItem = (index) => {
             const novasVariantes = [...formState.variantes];
-            novasVariantes[varianteAtiva].fichaTecnica.splice(itemIndex, 1);
+            novasVariantes[varianteAtiva].fichaTecnica.splice(index, 1);
             setFormState({ ...formState, variantes: novasVariantes });
         };
         
-        const handleUpdateVariante = (index, campo, valor) => {
+        const handleEdit = (p) => { setEditing(p); setFormState(p); setVarianteAtiva(0); };
+        const handleDelete = (id) => showConfirmationModal("Excluir este produto?", async () => {
+            try { await deleteDocument("produtosFinais", id); showModal("Produto excluído."); }
+            catch(error) { showModal("Erro ao excluir: " + error.message); }
+        });
+
+        const handleVarianteFieldChange = (field, value) => {
             const novasVariantes = [...formState.variantes];
-            novasVariantes[index][campo] = valor;
+            novasVariantes[varianteAtiva][field] = value;
             setFormState({ ...formState, variantes: novasVariantes });
         };
 
-        const handleAdicionarVariante = () => {
-            const novasVariantes = [...formState.variantes, { nomeVariante: `Variante ${formState.variantes.length + 1}`, custoEmbalagem: '', custoOperacional: '', fichaTecnica: [] }];
-            setFormState({ ...formState, variantes: novasVariantes });
-        };
+        const currentCmv = useMemo(() => {
+            if (!formState.variantes[varianteAtiva]) return 0;
+            const v = formState.variantes[varianteAtiva];
+            const custoItens = v.fichaTecnica.reduce((acc, item) => acc + item.custo, 0);
+            const custoEmb = parseFloat(String(v.custoEmbalagem || '0').replace(',', '.'));
+            const custoOp = parseFloat(String(v.custoOperacional || '0').replace(',', '.'));
+            return custoItens + custoEmb + custoOp;
+        }, [formState, varianteAtiva]);
 
-        const handleRemoverVariante = (index) => {
-            if (formState.variantes.length <= 1) {
-                showModal("O produto deve ter pelo menos uma variante.");
-                return;
-            }
-            const novasVariantes = [...formState.variantes];
-            novasVariantes.splice(index, 1);
-            setFormState({ ...formState, variantes: novasVariantes });
-            if (varianteAtiva >= index && varianteAtiva > 0) {
-                setVarianteAtiva(varianteAtiva - 1);
-            }
-        };
-        
-        const handleEditarProduto = (produto) => {
-            setEditingProduto(produto);
-            setFormState(produto);
-            setVarianteAtiva(0);
-        };
-
-        const handleDeleteProduto = (id) => {
-            showConfirmationModal("Excluir este produto e todas as suas fichas técnicas?", async () => {
-                try {
-                    await deleteDocument("produtosFinais", id);
-                    showModal("Produto excluído.");
-                } catch (error) {
-                    showModal("Erro ao excluir: " + error.message);
-                }
-            });
-        };
 
         return (
-            <div className="card">
-                <h2><IconeFichaTecnica /> Gerenciar Produtos Finais (Ficha Técnica)</h2>
-                <form onSubmit={handleSalvarProdutoFinal}>
+            <div className={`card ${isDisabled ? 'disabled-card' : ''}`} data-cy="card-gerenciar-produtos-finais">
+                {isDisabled && <div className="overlay-message"><p>Cadastre insumos com preço em "Catálogo" para criar fichas técnicas.</p></div>}
+                
+                <form onSubmit={handleSave}>
                     <div className="form-group-inline">
                         <div className="form-group"><label>Nome do Produto</label><input type="text" value={formState.nome} onChange={e => setFormState({...formState, nome: e.target.value})} placeholder="Ex: Pizza" required/></div>
                         <div className="form-group"><label>Categoria</label><input type="text" value={formState.categoria} onChange={e => setFormState({...formState, categoria: e.target.value})} placeholder="Ex: Pizzas Salgadas"/></div>
                     </div>
                     
                     <div className="variantes-manager">
-                        <h4>Variantes (Tamanhos/Sabores)</h4>
-                        <div className="variantes-tabs">
-                            {formState.variantes.map((v, index) => (
-                                <button type="button" key={index} onClick={() => setVarianteAtiva(index)} className={varianteAtiva === index ? 'active' : ''}>
-                                    {v.nomeVariante || `Variante ${index+1}`}
-                                </button>
+                        <h4>Variante: {formState.variantes[varianteAtiva].nomeVariante}</h4>
+                        <div className="form-group-inline">
+                            <div className="form-group"><label>Nome da Variante</label><input type="text" value={formState.variantes[varianteAtiva].nomeVariante} onChange={e => handleVarianteFieldChange('nomeVariante', e.target.value)} placeholder="Ex: Grande"/></div>
+                            <div className="form-group"><label>Custo Embalagem (R$)</label><input type="text" value={formState.variantes[varianteAtiva].custoEmbalagem} onChange={e => handleVarianteFieldChange('custoEmbalagem', e.target.value)} placeholder="1.50"/></div>
+                            <div className="form-group"><label>Outros Custos (R$)</label><input type="text" value={formState.variantes[varianteAtiva].custoOperacional} onChange={e => handleVarianteFieldChange('custoOperacional', e.target.value)} placeholder="3.00"/></div>
+                        </div>
+                        
+                        <h5>Ficha Técnica da Variante</h5>
+                        <div className="form-group-inline">
+                            <div className="form-group" style={{flex: 3}}>
+                                <label>Insumo</label>
+                                <select value={selectedInsumoId} onChange={e => setSelectedInsumoId(e.target.value)} aria-label="Selecione um item de compra">
+                                    <option value="">Selecione...</option>
+                                    {produtosDeCompra.filter(p => p.bestPrice).map(p => <option key={p.id} value={p.id}>{`${p.nome} - ${formatarValorPreciso(p.bestPrice)}/${p.unidadeAnalise}`}</option>)}
+                                </select>
+                                {produtosDeCompra.filter(p => p.bestPrice).length === 0 && (
+                                    <p className="sub-text">Nenhum insumo com preço para adicionar.</p>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label>Qtd ({selectedInsumo ? (selectedInsumo.unidadeAnalise === 'kg' ? 'g' : (selectedInsumo.unidadeAnalise === 'L' ? 'ml' : 'un')) : 'un'})</label>
+                                <input
+                                    type="text"
+                                    value={qtdInsumo}
+                                    onChange={e => setQtdInsumo(e.target.value)}
+                                    placeholder={`Ex: 150 ${selectedInsumo ? (selectedInsumo.unidadeAnalise === 'kg' ? 'g' : (selectedInsumo.unidadeAnalise === 'L' ? 'ml' : 'un')) : ''}`}
+                                    aria-label="Quantidade do item de compra"
+                                />
+                            </div>
+                            <button type="button" onClick={handleAddItem} className="button-secondary" disabled={!selectedInsumoId || !qtdInsumo} aria-label="Adicionar item à ficha técnica">+</button>
+                        </div>
+                        
+                        <div className="list-container" style={{maxHeight: '150px', borderTop: 'none', marginTop: 0}}>
+                            {formState.variantes[varianteAtiva].fichaTecnica.map((item, i) => (
+                                <div key={i} className="list-item"><p>{item.nome} - {item.quantidade} {item.unidade} ({formatarValor(item.custo)})</p><button type='button' className='button-icon' onClick={() => handleRemoveItem(i)}><IconeLixeira/></button></div>
                             ))}
-                            <button type="button" onClick={handleAdicionarVariante} className="button-add-variant">+</button>
+                            {formState.variantes[varianteAtiva].fichaTecnica.length === 0 && (
+                                <p className="sub-text">Nenhum insumo adicionado a esta ficha técnica.</p>
+                            )}
                         </div>
-                        <div className="variante-content">
-                            <div className="form-group-inline">
-                                <div className="form-group"><label>Nome da Variante</label><input type="text" value={formState.variantes[varianteAtiva].nomeVariante} onChange={e => handleUpdateVariante(varianteAtiva, 'nomeVariante', e.target.value)} placeholder="Ex: Grande, Calabresa"/></div>
-                                <div className="form-group"><label>Custo Embalagem (R$)</label><input type="text" value={formState.variantes[varianteAtiva].custoEmbalagem} onChange={e => handleUpdateVariante(varianteAtiva, 'custoEmbalagem', e.target.value)} placeholder="1.50"/></div>
-                                <div className="form-group"><label>Outros Custos (Gás, M.O.)</label><input type="text" value={formState.variantes[varianteAtiva].custoOperacional} onChange={e => handleUpdateVariante(varianteAtiva, 'custoOperacional', e.target.value)} placeholder="3.00"/></div>
-                                {formState.variantes.length > 1 && <button type="button" onClick={() => handleRemoverVariante(varianteAtiva)} className="button-icon"><IconeLixeira/></button>}
-                            </div>
-                            <h5>Ficha Técnica da Variante</h5>
-                            <div className="form-group-inline">
-                                <div className="form-group" style={{flex: 3}}><label>Insumo</label><select value={insumoFicha} onChange={e => setInsumoFicha(e.target.value)}><option value="">Selecione...</option>{insumos.map(i => <option key={i.id} value={i.id}>{`${i.nome} (${i.unidade_padrao})`}</option>)}</select></div>
-                                <div className="form-group"><label>Qtd</label><input type="text" value={qtdInsumoFicha} onChange={e => setQtdInsumoFicha(e.target.value)} placeholder="Ex: 150"/></div>
-                                <button type="button" onClick={handleAdicionarItemFicha} className="button-secondary" disabled={!insumoFicha || !qtdInsumoFicha}>+</button>
-                            </div>
-                            <div className="list-container" style={{maxHeight: '150px'}}>
-                                {formState.variantes[varianteAtiva].fichaTecnica.map((item, index) => (
-                                    <div key={index} className="list-item">
-                                        <span>{item.nome} - {item.quantidade} {item.unidade}</span>
-                                        <button type='button' className='button-icon' onClick={() => handleRemoverItemFicha(index)}><IconeLixeira/></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <p style={{textAlign:'right', fontWeight: 'bold', fontSize: '1.2rem'}}>CMV Total da Variante: {formatarValor(currentCmv)}</p>
                     </div>
-                    <div className="divider-soft" />
-                    <button type="submit" className="button-primary">{editingProduto ? 'Atualizar Produto' : 'Salvar Novo Produto'}</button>
-                    {editingProduto && <button type="button" onClick={resetForm} className="button-link">Cancelar Edição</button>}
+                    
+                    <button type="submit" className="button-primary" style={{marginTop: '1rem'}}>{editing ? 'Atualizar Produto' : 'Salvar Novo Produto'}</button>
+                    {editing && <button type="button" onClick={resetForm} className="button-link">Cancelar</button>}
                 </form>
 
                 <div className="divider" />
                 <h3><IconeFichaTecnica /> Produtos Finais Cadastrados</h3>
-                <div className="form-group"><label>Margem de Lucro para Preço Sugerido (%)</label><input type="number" value={margemLucro} onChange={e => setMargemLucro(Number(e.target.value))} /></div>
                 <div className="list-container">
                     {produtos.map(p => (
                         <div key={p.id} className="card" style={{marginBottom: '1rem'}}>
-                            <div className="list-item" style={{borderBottom: 'none', padding: 0}}>
-                                <h4>{p.nome} - <span className="sub-text">{p.categoria}</span></h4>
-                                <div className="list-item-actions">
-                                    <button className="button-icon" onClick={() => handleEditarProduto(p)}><IconeEditar/></button>
-                                    <button className="button-icon" onClick={() => handleDeleteProduto(p.id)}><IconeLixeira/></button>
-                                </div>
+                            <div className="list-item" style={{paddingBottom: 0}}>
+                                <h4>{p.nome} <span className="sub-text">{p.categoria}</span></h4>
+                                <div><button className="button-icon" onClick={() => handleEdit(p)}><IconeEditar/></button><button className="button-icon" onClick={() => handleDelete(p.id)}><IconeLixeira/></button></div>
                             </div>
-                            <div className="divider-soft" />
-                            {p.variantes.map((v, index) => (
-                                <div key={index} className="list-item">
+                            {p.variantes.map((v, i) => (
+                                <div key={i} className="list-item">
                                     <strong>{v.nomeVariante}</strong>
                                     <div>
                                         <p>CMV: <strong>{formatarValor(v.cmvCalculado)}</strong></p>
-                                        <p className="sub-text">Preço Sugerido: {formatarValor(v.cmvCalculado * (1 + margemLucro / 100))}</p>
+                                        <p className="sub-text">Preço Sugerido (Lucro {margemLucro}%): {formatarValor(v.cmvCalculado * (1 + margemLucro / 100))}</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ))}
+                    {produtos.length === 0 && <p className="sub-text">Nenhum produto final cadastrado ainda.</p>}
                 </div>
             </div>
         );
     };
     
     const CmvView = () => {
+        const { produtosDeCompra } = useData();
+        const isDisabled = !produtosDeCompra.some(item => item.bestPrice); 
+
         return (
-            <div className="grid-responsive">
-                <RegistrarCompra />
-                <GerenciarProdutosFinais />
+            <div>
+                 <div className="card">
+                    <h2><IconeFichaTecnica /> Gerenciar Produtos Finais (Fichas Técnicas)</h2>
+                    <p>Crie e gerencie as receitas dos seus produtos vendidos. O sistema usará o <strong>melhor preço</strong> cadastrado de cada insumo para calcular o Custo de Mercadoria Vendida (CMV) de forma automática.</p>
+                </div>
+                <GerenciarProdutosFinais isDisabled={isDisabled} />
             </div>
         );
     };
@@ -1381,51 +1752,22 @@ CMV_VIEW_JS_CONTENT = textwrap.dedent("""
     export default CmvView;
 """)
 
+# Removido: HistoricoView, sua lógica foi movida para RelatoriosView
 HISTORICO_VIEW_JS_CONTENT = textwrap.dedent("""
-    import React from 'react';
-    import { useData } from '../../context/DataContext';
-    import { IconeHistorico } from '../../utils/icons';
-    import { formatarData, formatarValor } from '../../utils/formatters';
-
-    const HistoricoView = () => {
-        const { allPedidos, loadingData } = useData();
-        
-        if (loadingData) {
-            return <div className="card"><h2>Carregando Histórico...</h2></div>;
-        }
-
-        return (
-            <div className="card">
-                <h2><IconeHistorico /> Histórico de Pedidos</h2>
-                <div className="list-container">
-                    {allPedidos.length > 0 ? allPedidos.map(pedido => (
-                        <div key={pedido.id} className="list-item">
-                            <div className="list-item-info">
-                                <p><strong>Fornecedor:</strong> {pedido.fornecedorNome}</p>
-                                <p className="sub-text"><strong>Data:</strong> {formatarData(pedido.criadoEm)}</p>
-                                <p className="sub-text"><strong>Solicitante:</strong> {pedido.solicitanteEmail}</p>
-                                <p className="sub-text"><strong>Status:</strong> {pedido.status}</p>
-                                <ul>{pedido.itens.map((item, index) => <li key={index}>- {item.qtd}x {item.nome}</li>)}</ul>
-                            </div>
-                            <p><strong>{formatarValor(pedido.valorTotal)}</strong></p>
-                        </div>
-                    )) : <p>Nenhum pedido no histórico.</p>}
-                </div>
-            </div>
-        );
-    };
-
-    export default HistoricoView;
+    // Este arquivo foi removido/integrado no RelatoriosView.js para simplificar a navegação.
+    // Sua lógica foi migrada para src/features/relatorios/RelatoriosView.js.
 """)
 
+# REESTRUTURADO: Centralização da comparação de preços
 PEDIDOS_VIEW_JS_CONTENT = textwrap.dedent("""
-    import React, { useState } from 'react';
+    import React, { useState, useMemo } from 'react';
     import { useData } from '../../context/DataContext';
     import { useUI } from '../../context/UIContext';
-    import { useAuth } from '../../context/AuthContext';
+    import { useAuth } from '../../context/Auth';
     import { addDocument } from '../../services/firestoreService';
-    import { formatarWhatsappParaLink } from '../../utils/formatters';
-    import { IconeCarrinho, IconeLixeira } from '../../utils/icons';
+    import { formatarWhatsappParaLink, formatarValorPreciso } from '../../utils/formatters';
+    import { IconeCarrinho, IconeLixeira, IconeBusca } from '../../utils/icons';
+    import ComparativePricesModal from '../../features/ComparativePricesModal/ComparativePricesModal';
 
     const PedidosView = () => {
         const { fornecedores, produtosDeCompra } = useData();
@@ -1433,149 +1775,238 @@ PEDIDOS_VIEW_JS_CONTENT = textwrap.dedent("""
         const { user } = useAuth();
         
         const [carrinho, setCarrinho] = useState({});
-        const [itemPedido, setItemPedido] = useState({ produtoId: '', qtd: 1, fornecedorId: '', observacao: '' });
+        const [searchTerm, setSearchTerm] = useState('');
+        const [selectedItem, setSelectedItem] = useState(null); // O item de compra selecionado para adicionar ao carrinho
+        const [itemData, setItemData] = useState({ qtd: 1, observacao: '', fornecedorId: '' }); // Dados do item no form
+        const [showPricesModal, setShowPricesModal] = useState(false); // Controla a visibilidade do modal de preços
 
-        const handleAddItemAoCarrinho = (e) => {
+        // Filtra produtos de compra com base no termo de busca e inclui o nome do melhor fornecedor
+        const filteredProducts = useMemo(() => {
+            if (!searchTerm) return [];
+            return produtosDeCompra
+                .filter(p => p.nome.toLowerCase().includes(searchTerm.toLowerCase()))
+                .map(p => ({
+                    ...p,
+                    bestPriceFornecedorName: p.bestPriceFornecedorId 
+                        ? (fornecedores.find(f => f.id === p.bestPriceFornecedorId)?.nome || 'N/A') 
+                        : 'N/A'
+                }));
+        }, [produtosDeCompra, searchTerm, fornecedores]);
+        
+        // Adiciona o item selecionado ao carrinho
+        const handleAddItem = (e) => {
             e.preventDefault();
-            const { produtoId, qtd, fornecedorId, observacao } = itemPedido;
-            const produtoInfo = produtosDeCompra.find(p => p.id === produtoId);
-            if (!produtoInfo || qtd <= 0) {
-                showModal("Selecione um produto e quantidade válidos.");
+            const fornecedor = fornecedores.find(f => f.id === itemData.fornecedorId);
+            if (!selectedItem || !fornecedor || itemData.qtd <= 0) {
+                showModal("Selecione um item e um fornecedor válidos.");
                 return;
             }
+
             const novoCarrinho = { ...carrinho };
-            if (!novoCarrinho[fornecedorId]) {
-                novoCarrinho[fornecedorId] = [];
+            if (!novoCarrinho[fornecedor.id]) {
+                novoCarrinho[fornecedor.id] = [];
             }
-            novoCarrinho[fornecedorId].push({ id: produtoId, nome: produtoInfo.nome, qtd: Number(qtd), observacao: observacao, unidade: produtoInfo.detalheCompra.unidadeCompra });
+            novoCarrinho[fornecedor.id].push({
+                id: selectedItem.id,
+                nome: selectedItem.nome,
+                qtd: Number(itemData.qtd),
+                observacao: itemData.observacao,
+                unidade: selectedItem.unidadeAnalise,
+                fornecedorItem: fornecedor.nome // Armazena o fornecedor escolhido para este item no carrinho
+            });
             setCarrinho(novoCarrinho);
-            setItemPedido({ produtoId: '', qtd: 1, fornecedorId: itemPedido.fornecedorId, observacao: '' });
+            resetItemSelection(); // Limpa a seleção e o formulário
         };
         
-        const handleEnviarPedidoWhatsApp = async (fornecedorId) => {
+        // Envia o pedido via WhatsApp
+        const handleSendOrder = async (fornecedorId) => {
             const fornecedor = fornecedores.find(f => f.id === fornecedorId);
-            const itensDoPedido = carrinho[fornecedorId];
-            if (!fornecedor || !itensDoPedido || itensDoPedido.length === 0) {
+            const itens = carrinho[fornecedorId];
+            if (!fornecedor || !itens || itens.length === 0) {
                 showModal("Não há itens no pedido para este fornecedor.");
                 return;
             }
 
-            let mensagem = `Olá, *${fornecedor.nome}*!\\nGostaria de fazer o seguinte pedido:\\n\\n`;
-            itensDoPedido.forEach(item => {
+            let mensagem = `Olá, *${fornecedor.nome}*!%0AGostaria de fazer o seguinte pedido:%0A%0A`;
+            itens.forEach(item => {
                 mensagem += `- ${item.qtd}x ${item.nome} (${item.unidade})`;
                 if (item.observacao) {
                     mensagem += ` (Obs: ${item.observacao})`;
                 }
-                mensagem += `\\n`;
+                mensagem += `%0A`;
             });
             
-            const link = `https://wa.me/${formatarWhatsappParaLink(fornecedor.whatsapp)}?text=${encodeURIComponent(mensagem)}`;
-            window.open(link, '_blank');
+            // Usar window.open para o link do WhatsApp
+            window.open(`https://wa.me/${formatarWhatsappParaLink(fornecedor.whatsapp)}?text=${mensagem}`, '_blank');
             
+            // Salvar o pedido no Firestore
             try {
                 await addDocument("pedidosRealizados", {
-                    fornecedorId: fornecedor.id,
+                    fornecedorId,
                     fornecedorNome: fornecedor.nome,
-                    itens: itensDoPedido,
+                    itens,
                     solicitanteEmail: user.email,
                     status: 'enviado',
-                    valorTotal: 0
+                    valorTotal: 0 // O valor total será atualizado na etapa de CMV quando a nota fiscal chegar
                 });
             } catch (error) {
                 showModal("Erro ao salvar pedido no histórico: " + error.message);
             }
             
+            // Remover os itens do carrinho após o envio
             const novoCarrinho = { ...carrinho };
             delete novoCarrinho[fornecedorId];
             setCarrinho(novoCarrinho);
         };
         
+        // Manipula o clique em um produto da lista de busca
+        const handleProductClick = (product) => {
+            setSelectedItem(product);
+            // Define o fornecedor padrão como o de melhor preço, se existir
+            setItemData(prev => ({ ...prev, fornecedorId: product.bestPriceFornecedorId || '' }));
+            setShowPricesModal(true); // Abre o modal de comparação de preços
+            setSearchTerm(''); // Limpa o termo de busca
+        };
+        
+        // Manipula a seleção de um preço no modal de comparação
+        const handlePriceSelected = (priceRecord) => {
+            setItemData(prev => ({ ...prev, fornecedorId: priceRecord.fornecedorId }));
+            setShowPricesModal(false); // Fecha o modal
+        };
+        
+        // Reseta o estado do formulário e da seleção de item
+        const resetItemSelection = () => {
+            setSelectedItem(null);
+            setSearchTerm('');
+            setItemData({ qtd: 1, observacao: '', fornecedorId: '' });
+        };
+
         return (
             <div className="card">
                 <h2><IconeCarrinho /> Fazer um Pedido</h2>
-                <form onSubmit={handleAddItemAoCarrinho}>
+                
+                {/* SEÇÃO DE BUSCA E SELEÇÃO DE ITEM */}
+                {!selectedItem && (
                     <div className="form-group">
-                        <label>1. Fornecedor</label>
-                        <select value={itemPedido.fornecedorId} onChange={(e) => setItemPedido({ ...itemPedido, fornecedorId: e.target.value, produtoId: '' })} required>
-                            <option value="">Selecione...</option>
-                            {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                        </select>
-                    </div>
-                    {itemPedido.fornecedorId && (
-                        <>
-                            <div className="form-group">
-                                <label>2. Produto do Catálogo</label>
-                                <select value={itemPedido.produtoId} onChange={(e) => setItemPedido({ ...itemPedido, produtoId: e.target.value })} required>
-                                    <option value="">Selecione...</option>
-                                    {produtosDeCompra.filter(p => p.fornecedorId === itemPedido.fornecedorId).map(p => (
-                                        <option key={p.id} value={p.id}>{p.nome} ({p.detalheCompra.unidadeCompra})</option>
-                                    ))}
-                                </select>
+                        <label htmlFor="product-search-input">Buscar Item de Compra</label>
+                        <div className="input-with-icon">
+                            <span className="icon"><IconeBusca /></span>
+                            <input
+                                id="product-search-input"
+                                type="text"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                placeholder="Digite para buscar (ex: Farinha, Queijo)..."
+                                aria-label="Buscar item de compra no catálogo"
+                            />
+                        </div>
+                        {searchTerm && filteredProducts.length > 0 && (
+                            <div className="list-container" style={{maxHeight: '200px', border: '1px solid var(--cor-borda)', borderRadius: '4px', marginTop: '0.5rem'}}>
+                                {filteredProducts.map(p => (
+                                    <div key={p.id} className="list-item" style={{cursor: 'pointer'}} onClick={() => handleProductClick(p)} aria-label={`Selecionar item ${p.nome}`}>
+                                        <div className="list-item-info">
+                                            <p><strong>{p.nome}</strong></p>
+                                            {p.bestPrice ? (
+                                                <p className="sub-text" style={{color: 'var(--cor-sucesso)'}}>
+                                                    Melhor Preço: {formatarValorPreciso(p.bestPrice)}/{p.unidadeAnalise} (Fornecedor: {p.bestPriceFornecedorName})
+                                                </p>
+                                            ) : <p className="sub-text">Sem preço registrado.</p>}
+                                        </div>
+                                        <button type="button" className="button-primary small" onClick={(e) => { e.stopPropagation(); handleProductClick(p); }} aria-label={`Ver preços para ${p.nome}`}>Ver Preços</button>
+                                    </div>
+                                ))}
                             </div>
+                        )}
+                        {searchTerm && filteredProducts.length === 0 && (
+                            <p className="sub-text">Nenhum item de compra encontrado com este nome.</p>
+                        )}
+                    </div>
+                )}
+                
+                {/* MODAL DE COMPARAÇÃO DE PREÇOS (abre quando um item é clicado) */}
+                {showPricesModal && selectedItem && (
+                    <ComparativePricesModal
+                        item={selectedItem}
+                        onSelectPrice={handlePriceSelected}
+                        onClose={() => setShowPricesModal(false)}
+                    />
+                )}
+
+                {/* SEÇÃO PARA ADICIONAR ITEM SELECIONADO AO CARRINHO */}
+                {selectedItem && (
+                    <form onSubmit={handleAddItem}>
+                        <div style={{padding: '1rem', border: '1px solid var(--cor-borda)', borderRadius: '8px'}}>
+                            <h4>Item Selecionado: {selectedItem.nome}</h4>
+                            <p className="sub-text">Fornecedor escolhido: <strong>{fornecedores.find(f => f.id === itemData.fornecedorId)?.nome || 'Nenhum selecionado'}</strong></p>
+                            
                             <div className="form-group-inline">
                                 <div className="form-group">
-                                    <label>3. Quantidade</label>
-                                    <input type="number" value={itemPedido.qtd} onChange={(e) => setItemPedido({ ...itemPedido, qtd: e.target.value })} min="1" required />
+                                    <label htmlFor="item-qtd-input">Quantidade</label>
+                                    <input id="item-qtd-input" type="number" value={itemData.qtd} onChange={e => setItemData({ ...itemData, qtd: e.target.value })} min="1" required aria-label="Quantidade do item de compra" />
                                 </div>
                                 <div className="form-group" style={{ flex: 2 }}>
-                                    <label>Observação (Opcional)</label>
-                                    <input type="text" value={itemPedido.observacao} onChange={e => setItemPedido({ ...itemPedido, observacao: e.target.value })} placeholder="Ex: Sem cebola" />
+                                    <label htmlFor="item-obs-input">Observação (Opcional)</label>
+                                    <input id="item-obs-input" type="text" value={itemData.observacao} onChange={e => setItemData({ ...itemData, observacao: e.target.value })} placeholder="Ex: Sem cebola" aria-label="Observação para o item" />
                                 </div>
                             </div>
-                            <button type="submit" className="button-secondary">Adicionar ao Carrinho</button>
-                        </>
-                    )}
-                </form>
+                            <button type="button" onClick={() => setShowPricesModal(true)} className="button-secondary">Comparar Preços</button>
+                            <button type="submit" className="button-primary" style={{marginLeft: '1rem'}} disabled={!itemData.fornecedorId}>Adicionar ao Carrinho</button>
+                            <button type="button" onClick={resetItemSelection} className="button-link">Cancelar</button>
+                        </div>
+                    </form>
+                )}
+
                 <div className="divider" />
                 <h3>Itens no Carrinho</h3>
                 <div className="list-container">
                     {Object.keys(carrinho).length > 0 ? Object.keys(carrinho).map(fornecedorId => {
                         const fornecedor = fornecedores.find(f => f.id === fornecedorId);
                         return (
-                            <div key={fornecedorId} className="pedido-fornecedor">
-                                <h4>Pedido para: {fornecedor?.nome || '...'}</h4>
+                            <div key={fornecedorId} style={{border: '1px solid #eee', borderRadius: '8px', padding: '1rem', marginBottom: '1rem'}}>
+                                <h4>Pedido para: {fornecedor?.nome || 'Fornecedor Desconhecido'}</h4>
                                 {carrinho[fornecedorId].map((item, index) => (
                                     <div key={index} className="list-item">
                                         <span>{item.qtd}x {item.nome} {item.observacao && <em className="sub-text">({item.observacao})</em>}</span>
                                         <button className="button-icon" onClick={() => {
-                                            const novoCarrinho = { ...carrinho };
-                                            novoCarrinho[fornecedorId].splice(index, 1);
-                                            if (novoCarrinho[fornecedorId].length === 0) {
-                                                delete novoCarrinho[fornecedorId];
+                                            const newCart = { ...carrinho };
+                                            newCart[fornecedorId].splice(index, 1);
+                                            if (newCart[fornecedorId].length === 0) {
+                                                delete newCart[fornecedorId];
                                             }
-                                            setCarrinho(novoCarrinho);
-                                        }}><IconeLixeira /></button>
+                                            setCarrinho(newCart);
+                                        }} aria-label={`Remover ${item.nome} do carrinho`}><IconeLixeira /></button>
                                     </div>
                                 ))}
-                                <button onClick={() => handleEnviarPedidoWhatsApp(fornecedorId)} className="button-primary">Enviar Pedido</button>
+                                <button onClick={() => handleSendOrder(fornecedorId)} className="button-primary" style={{marginTop: '1rem'}} aria-label={`Enviar pedido para ${fornecedor?.nome}`}>Enviar Pedido via WhatsApp</button>
                             </div>
                         )
-                    }) : <p className="sub-text">Seu carrinho está vazio.</p>}
+                    }) : <p className="sub-text">Seu carrinho está vazio. Adicione itens acima!</p>}
                 </div>
             </div>
         );
     };
-    
     export default PedidosView;
 """)
 
+# REESTRUTURADO: Agora um hub de análises que inclui histórico
 RELATORIOS_VIEW_JS_CONTENT = textwrap.dedent("""
     import React from 'react';
-    import { IconeGrafico } from '../../utils/icons';
+    import { IconeAnalises } from '../../utils/icons';
     import AnaliseDeCustoInsumo from './AnaliseDeCustoInsumo';
+    import HistoricoView from './HistoricoView'; # Agora HistoricoView é um subcomponente aqui
 
     const RelatoriosView = () => {
         return (
             <div>
                 <div className="card">
-                    <h2><IconeGrafico /> Relatórios Gerenciais</h2>
-                    <p>Esta área é dedicada à análise aprofundada dos dados do seu negócio.</p>
+                    <h2><IconeAnalises /> Análises e Histórico</h2>
+                    <p>Analise os dados do seu negócio para tomar decisões mais inteligentes.</p>
                 </div>
                 <AnaliseDeCustoInsumo />
+                <HistoricoView />
             </div>
         );
     };
-
     export default RelatoriosView;
 """)
 
@@ -1590,167 +2021,167 @@ ANALISE_CUSTO_INSUMO_JS_CONTENT = textwrap.dedent("""
     ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
     const AnaliseDeCustoInsumo = () => {
-        const { insumos, fornecedores, loadingData } = useData();
-        const [insumoSelecionado, setInsumoSelecionado] = useState(null);
+        const { produtosDeCompra, fornecedores, loadingData } = useData();
+        const [selectedItem, setSelectedItem] = useState(null);
 
-        const insumosAgrupados = useMemo(() => {
-            return insumos.reduce((acc, insumo) => {
-                const nomeBase = insumo.nome;
-                if (!acc[nomeBase]) {
-                    acc[nomeBase] = [];
-                }
-                acc[nomeBase].push(insumo);
-                return acc;
-            }, {});
-        }, [insumos]);
-        
-        const handleSelectInsumo = (nomeInsumo) => {
-            setInsumoSelecionado(insumosAgrupados[nomeInsumo] || null);
-        };
+        // Filtra apenas itens que têm histórico de preços
+        const itemsWithHistory = useMemo(() => 
+            produtosDeCompra.filter(p => p.historicoPrecos && p.historicoPrecos.length > 0), 
+        [produtosDeCompra]);
 
         const chartData = useMemo(() => {
-            if (!insumoSelecionado) return null;
+            if (!selectedItem) return null;
             
-            const labels = insumoSelecionado.map(i => fornecedores.find(f => f.id === i.fornecedorId)?.nome || 'N/A');
-            const data = insumoSelecionado.map(i => i.preco_por_unidade_padrao);
-            
+            // Agrupa os preços pelo fornecedor, pegando sempre o mais recente
+            const latestPrices = {};
+            selectedItem.historicoPrecos.forEach(rec => {
+                if (!latestPrices[rec.fornecedorId] || rec.dataCompra.seconds > latestPrices[rec.fornecedorId].dataCompra.seconds) {
+                    latestPrices[rec.fornecedorId] = rec;
+                }
+            });
+            const dataPoints = Object.values(latestPrices)
+                .map(rec => ({ ...rec, fornecedorNome: fornecedores.find(f => f.id === rec.fornecedorId)?.nome || 'N/A' }))
+                .sort((a,b) => a.precoPorUnidadeAnalise - b.precoPorUnidadeAnalise); // Ordena para o gráfico
+
             return {
-                labels,
+                labels: dataPoints.map(d => d.fornecedorNome),
                 datasets: [{
-                    label: `Custo por ${insumoSelecionado[0].unidade_padrao}`,
-                    data,
+                    label: `Custo por ${selectedItem.unidadeAnalise}`,
+                    data: dataPoints.map(d => d.precoPorUnidadeAnalise),
                     backgroundColor: 'rgba(217, 48, 37, 0.6)',
                 }]
             }
-        }, [insumoSelecionado, fornecedores]);
+        }, [selectedItem, fornecedores]);
 
 
         if (loadingData) return <div className="card"><h3>Carregando análise...</h3></div>;
 
         return (
             <div className="card">
-                <h3><IconeBusca /> Análise Comparativa de Custos por Insumo</h3>
+                <h3><IconeBusca /> Análise Comparativa de Custos</h3>
                 <div className="form-group">
-                    <label>Selecione um insumo para comparar os preços de compra</label>
-                    <select className="form-control" onChange={(e) => handleSelectInsumo(e.target.value)} defaultValue="">
-                        <option value="" disabled>Escolha um insumo...</option>
-                        {Object.keys(insumosAgrupados).sort().map(nome => (
-                            <option key={nome} value={nome}>{nome}</option>
-                        ))}
+                    <label htmlFor="item-select">Selecione um item para comparar preços entre fornecedores</label>
+                    <select id="item-select" className="form-control" onChange={e => setSelectedItem(itemsWithHistory.find(i => i.id === e.target.value))} defaultValue="">
+                        <option value="" disabled>Escolha um item...</option>
+                        {itemsWithHistory.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
                     </select>
+                    {itemsWithHistory.length === 0 && (
+                        <p className="sub-text">Nenhum item com histórico de preços para analisar. Cadastre e registre compras para seus insumos no "Catálogo".</p>
+                    )}
                 </div>
 
-                {insumoSelecionado && chartData && (
-                    <div>
-                        <div className="divider" />
-                        <h4>Comparativo de Custo para: {insumoSelecionado[0].nome}</h4>
-                        <div style={{ height: '300px', position: 'relative', marginBottom: '2rem' }}>
-                           <Bar data={chartData} options={{ maintainAspectRatio: false, responsive: true }} />
-                        </div>
-                        <div className="list-container" style={{maxHeight: '200px'}}>
-                            {insumoSelecionado.sort((a,b) => a.preco_por_unidade_padrao - b.preco_por_unidade_padrao).map(i => (
-                                <div key={i.id} className="list-item">
-                                    <p><strong>{fornecedores.find(f => f.id === i.fornecedorId)?.nome || 'N/A'}</strong></p>
-                                    <p>{formatarValorPreciso(i.preco_por_unidade_padrao)} / {i.unidade_padrao}</p>
-                                </div>
-                            ))}
-                        </div>
+                {selectedItem && chartData && (
+                    <div style={{ height: '300px', position: 'relative', marginTop: '2rem' }}>
+                        <Bar data={chartData} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false }, title: { display: true, text: `Comparativo para ${selectedItem.nome}` } } }} />
                     </div>
+                )}
+                {!selectedItem && itemsWithHistory.length > 0 && (
+                    <p className="sub-text" style={{marginTop: '1rem'}}>Selecione um item acima para visualizar o comparativo de preços.</p>
                 )}
             </div>
         );
     };
-
     export default AnaliseDeCustoInsumo;
 """)
 
 FIRESTORE_SERVICE_JS_CONTENT = textwrap.dedent("""
     import { db } from '../firebase';
-    import { collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc, increment } from "firebase/firestore";
+    import { collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 
-    export const addDocument = (collectionName, data) => {
-        return addDoc(collection(db, collectionName), { ...data, criadoEm: serverTimestamp() });
-    };
-    export const updateDocument = (collectionName, docId, data) => {
-        const docRef = doc(db, collectionName, docId);
-        return updateDoc(docRef, { ...data, atualizadoEm: serverTimestamp() });
-    };
-    export const deleteDocument = (collectionName, docId) => {
-        const docRef = doc(db, collectionName, docId);
-        return deleteDoc(docRef);
-    };
-    export const setDocument = (collectionName, docId, data) => {
-        const docRef = doc(db, collectionName, docId);
-        return setDoc(docRef, { ...data, atualizadoEm: serverTimestamp() }, { merge: true }); 
-    };
-    export const incrementField = (collectionName, docId, field, value) => {
-        const docRef = doc(db, collectionName, docId);
-        return updateDoc(docRef, { [field]: increment(value) });
-    };
+    export const addDocument = (collectionName, data) => addDoc(collection(db, collectionName), { ...data, criadoEm: serverTimestamp() });
+    export const updateDocument = (collectionName, docId, data) => updateDoc(doc(db, collectionName, docId), { ...data, atualizadoEm: serverTimestamp() });
+    export const deleteDocument = (collectionName, docId) => deleteDoc(doc(db, collectionName, docId));
+    export const setDocument = (collectionName, docId, data) => setDoc(doc(db, collectionName, docId), { ...data, atualizadoEm: serverTimestamp() }, { merge: true });
+    export const addDocumentToSubcollection = (parent, parentId, sub, data) => addDoc(collection(db, parent, parentId, sub), { ...data, criadoEm: serverTimestamp() });
 """)
 
+# REESTRUTURADO com novo ícone e remoção de HistoricoView.js
 ICONS_JS_CONTENT = textwrap.dedent("""
     import React from 'react';
     const Icon = ({ children, ...props }) => <span className="icon" {...props}>{children}</span>;
     export const IconeCaminhao = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM8 9h2m5-3v10l-2 2h-1" /></svg></Icon>;
-    export const IconeCadastro = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg></Icon>;
     export const IconeCarrinho = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c.51 0 .962-.343 1.087-.835l1.838-5.513c.279-.834-.26-1.745-1.132-1.745H4.883L3.117 3.187m15.75 11.25a3 3 0 00-3-3H7.5" /></svg></Icon>;
     export const IconeLixeira = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></Icon>;
     export const IconeEditar = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg></Icon>;
     export const IconeLogout = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg></Icon>;
-    export const IconeCmv = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg></Icon>;
-    export const IconeHistorico = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg></Icon>;
-    export const IconeGrafico = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h16.5v11.25A2.25 2.25 0 0118 16.5h-12A2.25 2.25 0 013.75 14.25V3z" /></svg></Icon>;
     export const IconeBusca = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></Icon>;
     export const IconeCatalogo = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg></Icon>;
     export const IconeDashboard = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg></Icon>;
     export const IconeFichaTecnica = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></Icon>;
-    export const IconeSalvar = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75l3 3m0 0l3-3m-3 3v-7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></Icon>;
+    export const IconeConfiguracoes = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 10-3 0M3.75 18H7.5m3-6h9.75m-9.75 0a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 12H7.5" /></svg></Icon>;
+    export const IconeCheck = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg></Icon>;
+    export const IconeCirculo = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></Icon>;
+    export const IconeMais = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg></Icon>;
+    export const IconeAnalises = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h15.75c.621 0 1.125.504 1.125 1.125v6.75c0 .621-.504 1.125-1.125 1.125H4.125c-.621 0-1.125-.504-1.125-1.125v-6.75zM4.125 12V8.25c0-.621.504-1.125 1.125-1.125h13.5c.621 0 1.125.504 1.125 1.125V12m-15.75 0v3.75m15.75-3.75v3.75M3 13.125V3" /></svg></Icon>;
+    export const IconeGrafico = (props) => <Icon {...props}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h16.5v11.25A2.25 2.25 0 0118 16.5h-12A2.25 2.25 0 013.75 14.25V3z" /></svg></Icon>;
 """)
 
 FORMATTERS_JS_CONTENT = textwrap.dedent("""
     export const formatarWhatsappParaLink = (numeroInput) => {
         let digitos = (numeroInput || '').replace(/\\D/g, '');
-        if (!digitos) return null;
-        if (digitos.length < 10) return null;
+        if (!digitos) return '';
         if (digitos.length >= 12 && digitos.startsWith('55')) return digitos;
-        if (digitos.length === 11 || digitos.length === 10) return `55${digitos}`;
-        return null;
+        return `55${digitos}`;
     };
-
     export const formatarWhatsappParaExibicao = (numeroSalvo) => {
         const digitos = String(numeroSalvo || '').replace(/\\D/g, '');
-        if (digitos.startsWith('55')) {
-            const numeroSemDDI = digitos.substring(2);
-            if (numeroSemDDI.length === 11) {
-                return `(${numeroSemDDI.substring(0, 2)}) ${numeroSemDDI.substring(2, 7)}-${numeroSemDDI.substring(7)}`;
-            }
-            if (numeroSemDDI.length === 10) {
-                return `(${numeroSemDDI.substring(0, 2)}) ${numeroSemDDI.substring(2, 6)}-${numeroSemDDI.substring(6)}`;
-            }
-        }
+        const num = digitos.startsWith('55') ? digitos.substring(2) : digitos;
+        if (num.length === 11) return `(${num.substring(0, 2)}) ${num.substring(2, 7)}-${num.substring(7)}`;
+        if (num.length === 10) return `(${num.substring(0, 2)}) ${num.substring(2, 6)}-${num.substring(6)}`;
         return numeroSalvo;
     };
-
-    export const formatarValor = (valor) => {
-        if (typeof valor !== 'number') return 'R$ 0,00';
-        return `R$ ${valor.toFixed(2).replace('.', ',')}`;
-    }
-
-    export const formatarValorPreciso = (valor) => {
-        if (typeof valor !== 'number') return 'R$ 0,00000';
-        return `R$ ${valor.toFixed(5).replace('.', ',')}`;
-    }
-
+    export const formatarValor = (valor) => typeof valor === 'number' ? `R$ ${valor.toFixed(2).replace('.', ',')}` : 'R$ 0,00';
+    export const formatarValorPreciso = (valor) => typeof valor === 'number' ? `R$ ${valor.toFixed(5).replace('.', ',')}` : 'N/A';
     export const formatarData = (timestamp) => {
-        if (!timestamp || !timestamp.seconds) return 'Data inválida';
-        return new Date(timestamp.seconds * 1000).toLocaleDateString('pt-BR', {
-            day: '2-digit', month: '2-digit', year: 'numeric'
-        });
+        if (!timestamp?.seconds) return 'N/A';
+        return new Date(timestamp.seconds * 1000).toLocaleDateString('pt-BR');
     };
 """)
 
-# --- ESTRUTURA FINAL DO PROJETO ---
+ONBOARDING_VIEW_JS_CONTENT = textwrap.dedent("""
+    import React from 'react';
+    import { useAuth } from '../../context/Auth';
+    import { useData } from '../../context/DataContext';
+    import { IconeCaminhao, IconeCheck, IconeCirculo } from '../../utils/icons';
+
+    const OnboardingView = () => {
+        const { user, updateOnboardingStatus } = useAuth();
+        const { fornecedores, produtosDeCompra, produtos } = useData();
+
+        const checklist = [
+            { text: 'Cadastre seu primeiro fornecedor', isComplete: fornecedores.length > 0 },
+            { text: 'Cadastre um item de compra (insumo)', isComplete: produtosDeCompra.length > 0 },
+            { text: 'Registre uma compra para ter um custo', isComplete: produtosDeCompra.some(p => p.bestPrice) },
+            { text: 'Crie sua primeira Ficha Técnica', isComplete: produtos.length > 0 },
+        ];
+        const allComplete = checklist.every(item => item.isComplete);
+
+        return (
+            <div className="login-container">
+                <div className="login-card card" style={{maxWidth: '600px'}}>
+                    <h1><IconeCaminhao /> Primeiros Passos!</h1>
+                    <p>Bem-vindo(a)! Complete os passos abaixo para configurar o sistema.</p>
+                    <div className="divider" />
+                    <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left' }}>
+                        {checklist.map((item, i) => (
+                            <li key={i} style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                                <span style={{ marginRight: '1rem', color: item.isComplete ? 'var(--cor-sucesso)' : 'var(--cor-borda)' }}>
+                                    {item.isComplete ? <IconeCheck /> : <IconeCirculo />}
+                                </span>
+                                {item.text}
+                            </li>
+                        ))}
+                    </ul>
+                    <button onClick={() => updateOnboardingStatus(user.uid, true)} className="button-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={!allComplete}>
+                        {allComplete ? "Vamos Começar!" : "Complete os passos para continuar"}
+                    </button>
+                </div>
+            </div>
+        );
+    };
+    export default OnboardingView;
+""")
+
 
 PROJECT_STRUCTURE = {
     "sistema-pedidos-100": {
@@ -1758,11 +2189,7 @@ PROJECT_STRUCTURE = {
         ".gitignore": GITIGNORE_CONTENT,
         "README.md": README_MD_CONTENT,
         "cypress.config.js": CYPRESS_CONFIG_JS_CONTENT,
-        "cypress": {
-            "e2e": {
-                "sistema_completo.cy.js": CYPRESS_TEST_FILE_CONTENT
-            }
-        },
+        "cypress": { "e2e": { "sistema_completo.cy.js": CYPRESS_TEST_FILE_CONTENT } },
         "public": { "index.html": INDEX_HTML_CONTENT },
         "src": {
             "App.css": APP_CSS_CONTENT,
@@ -1775,24 +2202,33 @@ PROJECT_STRUCTURE = {
                 "ui": { "Modal.js": MODAL_JS_CONTENT }
             },
             "context": {
-                "AuthContext.js": AUTH_CONTEXT_JS_CONTENT,
+                "Auth.js": AUTH_CONTEXT_JS_CONTENT,
                 "DataContext.js": DATA_CONTEXT_JS_CONTENT,
                 "UIContext.js": UI_CONTEXT_JS_CONTENT,
             },
             "features": {
                 "dashboard": { "DashboardView.js": DASHBOARD_VIEW_JS_CONTENT },
-                "cadastros": {
-                    "CadastrosView.js": CADASTROS_VIEW_JS_CONTENT,
-                    "GerenciarCatalogo.js": GERENCIAR_CATALOGO_JS_CONTENT,
+                "cadastros": { # Este diretório agora hospeda o CatalogoView unificado
+                    "CatalogoView.js": CADASTROS_VIEW_JS_CONTENT,
+                    # Os arquivos GerenciarItensDeCompra.js e GerenciarFornecedores.js
+                    # não são mais componentes separados no fluxo externo,
+                    # sua lógica foi integrada ou são sub-componentes internos de CatalogoView.
+                    # Mantidos aqui apenas para evitar erros de referência se existiam previamente.
+                    "GerenciarItensDeCompra.js": GERENCIAR_CATALOGO_JS_CONTENT,
                     "GerenciarFornecedores.js": GERENCIAR_FORNECEDORES_JS_CONTENT,
                 },
                 "cmv": { "CmvView.js": CMV_VIEW_JS_CONTENT },
-                "historico": { "HistoricoView.js": HISTORICO_VIEW_JS_CONTENT },
+                # HistoricoView.js foi movido para dentro de features/relatorios
+                "historico": { "HistoricoView.js": HISTORICO_VIEW_JS_CONTENT }, 
                 "pedidos": { "PedidosView.js": PEDIDOS_VIEW_JS_CONTENT },
                 "relatorios": {
                     "RelatoriosView.js": RELATORIOS_VIEW_JS_CONTENT,
-                    "AnaliseDeCustoInsumo.js": ANALISE_CUSTO_INSUMO_JS_CONTENT
-                }
+                    "AnaliseDeCustoInsumo.js": ANALISE_CUSTO_INSUMO_JS_CONTENT,
+                    "HistoricoView.js": HISTORICO_VIEW_JS_CONTENT # HistoricoView agora está aqui
+                },
+                "onboarding": { "OnboardingView.js": ONBOARDING_VIEW_JS_CONTENT } ,
+                "RegistrarCompraModal": { "RegistrarCompraModal.js": REGISTRAR_COMPRA_MODAL_JS_CONTENT },
+                "ComparativePricesModal": { "ComparativePricesModal.js": COMPARATIVE_PRICES_MODAL_JS_CONTENT }
             },
             "services": { "firestoreService.js": FIRESTORE_SERVICE_JS_CONTENT },
             "utils": {
@@ -1808,32 +2244,40 @@ def create_project_structure(base_path, structure):
     for name, content in structure.items():
         current_path = os.path.join(base_path, name)
         if isinstance(content, dict):
-            print(f"Criando diretório: {current_path}")
+            # Cria o diretório se ele não existir
             os.makedirs(current_path, exist_ok=True)
             create_project_structure(current_path, content)
         else:
-            print(f"Criando arquivo:   {current_path}")
+            # Para arquivos vazios (indicando remoção/integração), crie um arquivo vazio
+            # ou trate como se fosse removido da estrutura final.
+            # Aqui, vou criar os arquivos com o conteúdo fornecido (pode ser vazio).
             with open(current_path, 'w', encoding='utf-8') as f:
                 f.write(content.strip())
 
 def main():
-    print("Iniciando a criação da estrutura do projeto React e dos testes Cypress...")
-    project_root = os.getcwd()
-    create_project_structure(project_root, PROJECT_STRUCTURE)
-
-    print("\\n" + "="*50)
-    print("✅ Estrutura do projeto corrigida e criada com sucesso!")
+    # Define o nome da pasta raiz do projeto refatorado
+    project_root = "sistema-pedidos-refatorado"
+    print(f"Iniciando a criação da estrutura do projeto refatorado em: '{project_root}'")
+    
+    # Cria a pasta raiz do projeto
+    os.makedirs(project_root, exist_ok=True)
+    
+    # Chama a função para criar a estrutura recursivamente, usando a estrutura interna
+    create_project_structure(project_root, PROJECT_STRUCTURE["sistema-pedidos-100"])
+    
+    print("\n" + "="*50)
+    print("✅ Estrutura do projeto refatorada e criada com sucesso!")
     print("="*50)
-    print("\\nPróximos passos:")
-    print("1. Navegue até a pasta do projeto:")
-    print("   cd sistema-pedidos-100")
-    print("\\n2. Instale as dependências (requer Node.js e npm):")
+    print("\nPróximos passos:")
+    print(f"1. Navegue até a pasta do projeto:")
+    print(f"   cd {project_root}")
+    print("\n2. Instale as dependências (requer Node.js e npm):")
     print("   npm install")
-    print("\\n3. Inicie o servidor de desenvolvimento:")
+    print("\n3. Inicie o servidor de desenvolvimento:")
     print("   npm start")
-    print("\\n4. Em um novo terminal, execute o comando para abrir o Cypress:")
+    print("\n4. Em um novo terminal, execute os testes automatizados para verificar os novos fluxos:")
     print("   npm run cypress:open")
-    print("\\nLembre-se: Configure suas credenciais em 'src/firebase.js'!")
+    print("\nLembre-se: Configure suas credenciais em 'src/firebase.js'!")
 
 if __name__ == "__main__":
     main()
