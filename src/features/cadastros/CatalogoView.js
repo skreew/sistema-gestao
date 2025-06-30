@@ -1,85 +1,31 @@
 import React, { useState, useMemo } from 'react';
 import { useUI } from '../../context/UIContext';
 import { useData } from '../../context/DataContext';
-import { addDocument, updateDocument, deleteDocument, addDocumentToSubcollection } from '../../services/firestoreService';
-import { IconeCaminhao, IconeBusca, IconeEditar, IconeLixeira, IconeMais, IconeCatalogo } from '../../utils/icons';
-import { formatarWhatsappParaLink, formatarWhatsappParaExibicao, formatarValorPreciso } from '../../utils/formatters';
-import Modal from '../../components/ui/Modal'; // Para o mini-modal de novo fornecedor
-
-// Componente interno para adicionar/gerenciar um novo fornecedor (mini-modal)
-const QuickAddFornecedorModal = ({ onClose, onFornecedorAdded }) => {
-    const [nome, setNome] = useState('');
-    const [whatsapp, setWhatsapp] = useState('');
-    const { showModal } = useUI();
-
-    const handleSave = async (e) => {
-        e.preventDefault();
-        const formattedNumber = formatarWhatsappParaLink(whatsapp);
-        if (!nome || !formattedNumber) {
-            showModal('Preencha o nome e um WhatsApp válido.');
-            return;
-        }
-        try {
-            const docRef = await addDocument("fornecedores", { nome, whatsapp: formattedNumber, observacoes: null });
-            showModal('Fornecedor salvo!');
-            onFornecedorAdded(docRef.id);
-            onClose();
-        } catch (error) {
-            showModal('Erro ao salvar: ' + error.message);
-        }
-    };
-
-    return (
-        <Modal title="Novo Fornecedor" onConfirm={handleSave} showCancel={true} onCancel={onClose} confirmText="Salvar">
-            <form onSubmit={handleSave}>
-                <div className="form-group"><label>Nome</label><input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome da empresa" required /></div>
-                <div className="form-group"><label>WhatsApp</label><input type="text" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="(XX) XXXXX-XXXX" required /></div>
-            </form>
-        </Modal>
-    );
-};
-
+import { addDocument, addDocumentToSubcollection } from '../../services/firestoreService';
+import { IconeCatalogo } from '../../utils/icons';
+import { formatarValorPreciso, formatarValor } from '../../utils/formatters';
 
 const CatalogoView = () => {
-    const { showModal, showConfirmationModal } = useUI();
+    const { showModal } = useUI();
     const { fornecedores, produtosDeCompra } = useData();
-    const [activeTab, setActiveTab] = useState('fornecedores'); // 'fornecedores' ou 'itensDeCompra'
 
-    // Estado para o formulário unificado de Insumos/Compras
-    const [insumoForm, setInsumoForm] = useState({
-        id: null, // Para edição
-        nome: '',
-        unidadeAnalise: 'kg',
-        fornecedorId: '',
+    const initialFormState = {
+        id: null, nome: '', unidadeAnalise: 'kg', fornecedorId: '',
         dataCompra: new Date().toISOString().split('T')[0],
-        quantidadeComprada: '',
-        precoTotalNota: ''
-    });
+        precoTotalNota: '',
+        // Novos campos para compra em atacado/embalagem
+        isEmbalagem: false,
+        quantidadeEmbalagens: '1',
+        unidadesPorEmbalagem: '',
+        pesoPorUnidade: '',
+    };
+
+    const [insumoForm, setInsumoForm] = useState(initialFormState);
     const [isNewInsumo, setIsNewInsumo] = useState(false);
-    const [buscaInsumo, setBuscaInsumo] = useState('');
-    const [showQuickAddFornecedor, setShowQuickAddFornecedor] = useState(false);
 
-    // Fornecedores para a lista
-    const [buscaFornecedor, setBuscaFornecedor] = useState('');
-    const filteredFornecedores = useMemo(() =>
-        fornecedores.filter(f => f.nome.toLowerCase().includes(buscaFornecedor.toLowerCase())),
-        [fornecedores, buscaFornecedor]
-    );
-
-    // Itens de Compra (Insumos) para a lista
-    const filteredItensDeCompra = useMemo(() => {
-        const products = Array.isArray(produtosDeCompra) ? produtosDeCompra : [];
-        return products.filter(p => p.nome.toLowerCase().includes(buscaInsumo.toLowerCase())).map(p => ({
-            ...p,
-            bestPriceFornecedorNome: p.bestPriceFornecedorId ? (fornecedores.find(f => f.id === p.bestPriceFornecedorId)?.nome || 'N/A') : null
-        }));
-    }, [produtosDeCompra, buscaInsumo, fornecedores]);
-
-
-    // --- Lógica do Super Cadastro (Insumos/Compras) ---
     const handleInsumoFormChange = (e) => {
-        const { name, value } = e.target;
-        setInsumoForm(prev => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        setInsumoForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
     const handleInsumoNomeBlur = () => {
@@ -93,118 +39,104 @@ const CatalogoView = () => {
         }
     };
 
+    const { custoUnitarioCalculado, erroCalculo } = useMemo(() => {
+        const { precoTotalNota, isEmbalagem, quantidadeEmbalagens, unidadesPorEmbalagem, pesoPorUnidade, unidadeAnalise } = insumoForm;
+        const preco = parseFloat(String(precoTotalNota).replace(',', '.'));
+        if (isNaN(preco) || preco <= 0) return { custoUnitarioCalculado: null, erroCalculo: null };
+
+        if (isEmbalagem) {
+            const qtdeEmb = parseFloat(String(quantidadeEmbalagens).replace(',', '.'));
+            const unidsPorEmb = parseFloat(String(unidadesPorEmbalagem).replace(',', '.'));
+            const pesoPorUnid = parseFloat(String(pesoPorUnidade).replace(',', '.'));
+
+            if (isNaN(qtdeEmb) || isNaN(unidsPorEmb) || isNaN(pesoPorUnid) || qtdeEmb <= 0 || unidsPorEmb <= 0 || pesoPorUnid <= 0) {
+                return { custoUnitarioCalculado: null, erroCalculo: "Preencha os dados da embalagem." };
+            }
+            const totalUnidadesBase = qtdeEmb * unidsPorEmb * pesoPorUnid;
+            if (totalUnidadesBase === 0) return { custoUnitarioCalculado: null, erroCalculo: "Total de unidades não pode ser zero." };
+
+            const custoFinal = preco / totalUnidadesBase;
+            return { custoUnitarioCalculado: `${formatarValorPreciso(custoFinal)} / ${unidadeAnalise}`, erroCalculo: null };
+        }
+        return { custoUnitarioCalculado: null, erroCalculo: null };
+
+    }, [insumoForm]);
+
     const handleSaveInsumoOrPurchase = async (e) => {
         e.preventDefault();
-        const { nome, unidadeAnalise, fornecedorId, dataCompra, quantidadeComprada, precoTotalNota, id } = insumoForm;
-        const qtd = parseFloat(String(quantidadeComprada).replace(',', '.'));
-        const precoTotal = parseFloat(String(precoTotalNota).replace(',', '.'));
+        const { nome, unidadeAnalise, fornecedorId, dataCompra, precoTotalNota, id, isEmbalagem, quantidadeEmbalagens, unidadesPorEmbalagem, pesoPorUnidade } = insumoForm;
 
-        if (!nome || !unidadeAnalise || !fornecedorId || isNaN(qtd) || qtd <= 0 || isNaN(precoTotal) || precoTotal <= 0) {
-            showModal("Preencha todos os campos do insumo e da compra corretamente.");
+        const preco = parseFloat(String(precoTotalNota).replace(',', '.'));
+        if (!nome || !unidadeAnalise || !fornecedorId || isNaN(preco) || preco <= 0) {
+            showModal("Preencha nome, unidade, fornecedor e preço total corretamente.");
+            return;
+        }
+
+        let quantidadeTotalUnidadeAnalise = 0;
+        let precoPorUnidadeAnalise = 0;
+
+        if(isEmbalagem) {
+            const qtdeEmb = parseFloat(String(quantidadeEmbalagens).replace(',', '.'));
+            const unidsPorEmb = parseFloat(String(unidadesPorEmbalagem).replace(',', '.'));
+            const pesoPorUnid = parseFloat(String(pesoPorUnidade).replace(',', '.'));
+            if (isNaN(qtdeEmb) || isNaN(unidsPorEmb) || isNaN(pesoPorUnid) || pesoPorUnid <= 0) {
+                showModal("Dados da embalagem inválidos."); return;
+            }
+            quantidadeTotalUnidadeAnalise = qtdeEmb * unidsPorEmb * pesoPorUnid;
+            precoPorUnidadeAnalise = preco / quantidadeTotalUnidadeAnalise;
+        } else {
+            showModal("O modo de compra 'unitário' ainda precisa ser implementado. Selecione 'Embalagem/Caixa'.");
+            return; // Bloqueia a lógica não implementada
+        }
+
+        if (quantidadeTotalUnidadeAnalise <= 0) {
+            showModal("A quantidade final calculada não pode ser zero.");
             return;
         }
 
         try {
             let currentInsumoId = id;
             if (isNewInsumo || !currentInsumoId) {
-                // Crie um novo documento de insumo se for um insumo novo
                 const newInsumoRef = await addDocument("produtosDeCompra", { nome, unidadeAnalise });
                 currentInsumoId = newInsumoRef.id;
-                showModal("Novo insumo cadastrado!");
             }
 
-            // Registrar a compra na subcoleção historicoPrecos
-            const precoPorUnidadeAnalise = precoTotal / qtd;
             const purchaseRecord = {
-                fornecedorId,
-                dataCompra: new Date(dataCompra),
-                precoTotalNota: precoTotal,
-                quantidadeComprada: qtd,
-                unidadeComprada: unidadeAnalise, // Unidade da compra é a unidade de análise
+                fornecedorId, dataCompra: new Date(dataCompra), precoTotalNota: preco,
+                quantidadeComprada: quantidadeTotalUnidadeAnalise, // Salva o total calculado na unidade de análise
+                unidadeAnalise: unidadeAnalise,
                 precoPorUnidadeAnalise,
+                detalhesCompra: { isEmbalagem, quantidadeEmbalagens, unidadesPorEmbalagem, pesoPorUnidade }
             };
             await addDocumentToSubcollection("produtosDeCompra", currentInsumoId, "historicoPrecos", purchaseRecord);
             showModal(`Compra registrada para ${nome}! Custo: ${formatarValorPreciso(precoPorUnidadeAnalise)}/${unidadeAnalise}`);
 
-            resetInsumoForm();
+            setInsumoForm(initialFormState);
+            setIsNewInsumo(false);
         } catch (error) {
-            showModal("Erro ao salvar insumo/compra: " + error.message);
+            showModal("Erro ao salvar compra: " + error.message);
         }
     };
 
-    const resetInsumoForm = () => {
-        setInsumoForm({
-            id: null,
-            nome: '',
-            unidadeAnalise: 'kg',
-            fornecedorId: '',
-            dataCompra: new Date().toISOString().split('T')[0],
-            quantidadeComprada: '',
-            precoTotalNota: ''
-        });
-        setIsNewInsumo(false);
-    };
-
-    const handleEditInsumo = (insumo) => {
-        // Preenche o formulário para edição de insumo
-        setInsumoForm({
-            id: insumo.id,
-            nome: insumo.nome,
-            unidadeAnalise: insumo.unidadeAnalise,
-            fornecedorId: '', // Não preencher dados de compra aqui
-            dataCompra: new Date().toISOString().split('T')[0],
-            quantidadeComprada: '',
-            precoTotalNota: ''
-        });
-        setIsNewInsumo(false); // É um insumo existente
-        setActiveTab('itensDeCompra'); // Ir para a aba do formulário
-    };
-
-    const handleDeleteInsumo = (id) => {
-        showConfirmationModal("Excluir este item de compra e todo seu histórico de preços?", async () => {
-            try {
-                await deleteDocument("produtosDeCompra", id);
-                showModal("Item de compra excluído.");
-            } catch (error) {
-                showModal("Erro ao excluir: " + error.message);
-            }
-        });
-    };
-
-    // --- Renderização ---
     return (
         <div>
             <div className="card">
-                <h2><IconeCatalogo /> Catálogo de Itens e Fornecedores</h2>
-                <p>Gerencie seus fornecedores e todos os insumos que você compra. Para cada insumo, registre as compras para que o sistema saiba o custo por unidade.</p>
+                <h2><IconeCatalogo /> Catálogo e Compras</h2>
+                <p>Cadastre novos insumos e registre suas compras para calcular os custos com precisão.</p>
             </div>
 
-            {/* Seção de Registro de Nova Compra / Cadastro de Insumo */}
             <div className="card">
-                <h3>Registrar Nova Compra / Cadastrar Insumo</h3>
+                <h3>Registrar Nova Compra</h3>
                 <form onSubmit={handleSaveInsumoOrPurchase}>
                     <div className="form-group">
                         <label>Nome do Insumo</label>
-                        <input
-                            name="nome"
-                            type="text"
-                            value={insumoForm.nome}
-                            onChange={handleInsumoFormChange}
-                            onBlur={handleInsumoNomeBlur}
-                            placeholder="Ex: Farinha de Trigo, Leite"
-                            required
-                        />
+                        <input name="nome" type="text" value={insumoForm.nome} onChange={handleInsumoFormChange} onBlur={handleInsumoNomeBlur} placeholder="Digite o nome de um insumo novo ou existente" required />
                     </div>
 
                     {isNewInsumo && (
                         <div className="form-group">
-                            <label>Unidade para Análise de Custo</label>
-                            <select
-                                name="unidadeAnalise"
-                                value={insumoForm.unidadeAnalise}
-                                onChange={handleInsumoFormChange}
-                                required
-                            >
+                            <label>Unidade para Análise de Custo (Ex: kg, L, un)</label>
+                            <select name="unidadeAnalise" value={insumoForm.unidadeAnalise} onChange={handleInsumoFormChange} required>
                                 <option value="kg">Quilograma (kg)</option>
                                 <option value="L">Litro (L)</option>
                                 <option value="un">Unidade (un)</option>
@@ -213,153 +145,53 @@ const CatalogoView = () => {
                     )}
 
                     <div className="form-group">
-                        <label>Fornecedor
-                            <button type="button" className="button-link" onClick={() => setShowQuickAddFornecedor(true)} style={{marginLeft: '0.5rem', fontSize: '0.9rem'}}>
-                                + Novo Fornecedor
-                            </button>
-                        </label>
-                        <select
-                            name="fornecedorId"
-                            value={insumoForm.fornecedorId}
-                            onChange={handleInsumoFormChange}
-                            required
-                        >
+                        <label>Fornecedor</label>
+                        <select name="fornecedorId" value={insumoForm.fornecedorId} onChange={handleInsumoFormChange} required>
                             <option value="">Selecione um fornecedor...</option>
-                            {fornecedores.map(f => (
-                                <option key={f.id} value={f.id}>{f.nome}</option>
-                            ))}
+                            {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                         </select>
                     </div>
 
+                    <div className="divider-soft"></div>
+                    <h4>Detalhes da Compra</h4>
+
                     <div className="form-group">
-                        <label>Data da Compra</label>
-                        <input
-                            name="dataCompra"
-                            type="date"
-                            value={insumoForm.dataCompra}
-                            onChange={handleInsumoFormChange}
-                            required
-                        />
+                        <label>
+                            <input type="checkbox" name="isEmbalagem" checked={insumoForm.isEmbalagem} onChange={handleInsumoFormChange} />
+                            A compra foi por Embalagem/Caixa?
+                        </label>
                     </div>
 
-                    <div className="form-group-inline">
-                        <div className="form-group">
-                            <label>Quantidade Comprada ({insumoForm.unidadeAnalise})</label>
-                            <input
-                                name="quantidadeComprada"
-                                type="text"
-                                value={insumoForm.quantidadeComprada}
-                                onChange={handleInsumoFormChange}
-                                placeholder={`Ex: 25 (${insumoForm.unidadeAnalise})`}
-                                required
-                            />
+                    {insumoForm.isEmbalagem && (
+                        <div className="form-group-inline">
+                            <div className="form-group">
+                                <label>Qtde. Embalagens</label>
+                                <input name="quantidadeEmbalagens" type="text" value={insumoForm.quantidadeEmbalagens} onChange={handleInsumoFormChange} placeholder="Ex: 1" />
+                            </div>
+                            <div className="form-group">
+                                <label>Unidades por Embalagem</label>
+                                <input name="unidadesPorEmbalagem" type="text" value={insumoForm.unidadesPorEmbalagem} onChange={handleInsumoFormChange} placeholder="Ex: 12" />
+                            </div>
+                            <div className="form-group">
+                                <label>Peso/Vol. por Unidade ({insumoForm.unidadeAnalise})</label>
+                                <input name="pesoPorUnidade" type="text" value={insumoForm.pesoPorUnidade} onChange={handleInsumoFormChange} placeholder="Ex: 0.400 para 400g" />
+                            </div>
                         </div>
-                        <div className="form-group">
-                            <label>Preço Total na Nota (R$)</label>
-                            <input
-                                name="precoTotalNota"
-                                type="text"
-                                value={insumoForm.precoTotalNota}
-                                onChange={handleInsumoFormChange}
-                                placeholder="Ex: 120.00"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    {insumoForm.quantidadeComprada && insumoForm.precoTotalNota && !isNaN(parseFloat(insumoForm.quantidadeComprada)) && !isNaN(parseFloat(insumoForm.precoTotalNota)) && (
-                        <p style={{textAlign: 'center', fontWeight: 'bold', marginTop: '1rem'}}>
-                            Custo por {insumoForm.unidadeAnalise}: {formatarValorPreciso(parseFloat(insumoForm.precoTotalNota) / parseFloat(insumoForm.quantidadeComprada))}
-                        </p>
                     )}
 
-                    <button type="submit" className="button-primary">
-                        {insumoForm.id ? 'Registrar Nova Compra' : 'Cadastrar Insumo e Registrar Compra'}
+                    <div className="form-group">
+                        <label>Preço Total na Nota (R$)</label>
+                        <input name="precoTotalNota" type="text" value={insumoForm.precoTotalNota} onChange={handleInsumoFormChange} placeholder="Ex: 120.00" required />
+                    </div>
+
+                    {custoUnitarioCalculado && <p style={{fontWeight: 'bold', color: 'var(--cor-sucesso)'}}>Custo Calculado: {custoUnitarioCalculado}</p>}
+                    {erroCalculo && <p style={{fontWeight: 'bold', color: 'var(--cor-perigo)'}}>{erroCalculo}</p>}
+
+                    <button type="submit" className="button-primary" style={{marginTop: '1rem'}}>
+                        {isNewInsumo ? 'Cadastrar Insumo e Registrar Compra' : 'Registrar Nova Compra'}
                     </button>
-                    {insumoForm.id && <button type="button" onClick={resetInsumoForm} className="button-link">Limpar Formulário</button>}
                 </form>
             </div>
-
-            {showQuickAddFornecedor && (
-                <QuickAddFornecedorModal
-                    onClose={() => setShowQuickAddFornecedor(false)}
-                    onFornecedorAdded={(id) => setInsumoForm(prev => ({ ...prev, fornecedorId: id }))}
-                />
-            )}
-
-            <div className="divider" />
-
-            {/* Tabs de visualização */}
-            <div className="variantes-tabs"> {/* Reutilizando a classe de tabs */}
-                <button className={activeTab === 'fornecedores' ? 'active' : ''} onClick={() => setActiveTab('fornecedores')}>
-                    Lista de Fornecedores
-                </button>
-                <button className={activeTab === 'itensDeCompra' ? 'active' : ''} onClick={() => setActiveTab('itensDeCompra')}>
-                    Lista de Insumos
-                </button>
-            </div>
-
-            {/* Conteúdo das Tabs */}
-            {activeTab === 'fornecedores' && (
-                <div className="card">
-                    <h3><IconeCaminhao /> Seus Fornecedores</h3>
-                    <div className="form-group">
-                        <div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={buscaFornecedor} onChange={e => setBuscaFornecedor(e.target.value)} placeholder="Buscar fornecedor..." /></div>
-                    </div>
-                    <div className="list-container">
-                        {filteredFornecedores.length > 0 ? filteredFornecedores.map(f => (
-                            <div key={f.id} className="list-item">
-                                <div className="list-item-info">
-                                    <p><strong>{f.nome}</strong></p>
-                                    <a href={`https://wa.me/${f.whatsapp}`} target="_blank" rel="noopener noreferrer">{formatarWhatsappParaExibicao(f.whatsapp)}</a>
-                                    {f.observacoes && <p className='sub-text'>Obs: {f.observacoes}</p>}
-                                </div>
-                                <div className="list-item-actions">
-                                    <button className="button-icon" onClick={() => { /* Implementar edição de fornecedor direto na lista se necessário */ }} aria-label={`Editar ${f.nome}`}><IconeEditar /></button>
-                                    <button className="button-icon" onClick={() => { /* Implementar exclusão de fornecedor direto na lista se necessário */ }} aria-label={`Excluir ${f.nome}`}><IconeLixeira /></button>
-                                </div>
-                            </div>
-                        )) : <p className="sub-text">Nenhum fornecedor cadastrado.</p>}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'itensDeCompra' && (
-                <div className="card">
-                    <h3><IconeCatalogo /> Seus Insumos Cadastrados</h3>
-                    <div className="form-group">
-                        <div className="input-with-icon"><span className="icon"><IconeBusca /></span><input type="text" value={buscaInsumo} onChange={e => setBuscaInsumo(e.target.value)} placeholder="Buscar insumo..." /></div>
-                    </div>
-                    <div className="list-container">
-                        {filteredItensDeCompra.length > 0 ? filteredItensDeCompra.map(p => (
-                            <div key={p.id} className="list-item">
-                                <div className="list-item-info">
-                                    <p><strong>{p.nome}</strong> (Análise p/ {p.unidadeAnalise})</p>
-                                    {p.bestPrice ? (
-                                        <p className="sub-text" style={{color: 'var(--cor-sucesso)'}}>Melhor Preço: <strong>{formatarValorPreciso(p.bestPrice)}/{p.unidadeAnalise}</strong> ({p.bestPriceFornecedorNome})</p>
-                                    ) : <p className="sub-text">Nenhum custo registrado.</p>}
-                                </div>
-                                <div className="list-item-actions">
-                                    <button className="button-icon" onClick={() => {
-                                        // Preencher o formulário principal com o insumo para registrar nova compra
-                                        setInsumoForm(prev => ({ 
-                                            ...prev, 
-                                            id: p.id, 
-                                            nome: p.nome, 
-                                            unidadeAnalise: p.unidadeAnalise,
-                                            fornecedorId: p.bestPriceFornecedorId || '' // Sugere o último fornecedor usado
-                                        }));
-                                        setIsNewInsumo(false);
-                                        // Scroll para o topo para o formulário
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }} aria-label={`Registrar nova compra para ${p.nome}`}><IconeMais/></button>
-                                    <button className="button-icon" onClick={() => handleDeleteInsumo(p.id)} aria-label={`Excluir item ${p.nome}`}><IconeLixeira /></button>
-                                </div>
-                            </div>
-                        )) : <p className="sub-text">Nenhum insumo cadastrado.</p>}
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

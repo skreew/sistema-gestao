@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from './context/Auth';
+import { useAuth } from './context/AuthContext';
 import { useUI } from './context/UIContext';
 import AccessSelectionPage from './components/auth/AccessSelectionPage';
 import Modal from './components/ui/Modal';
 import DashboardView from './features/dashboard/DashboardView';
 import PedidosView from './features/pedidos/PedidosView';
-import CatalogoView from './features/cadastros/CatalogoView'; // Renomeado e refatorado
+import CatalogoView from './features/cadastros/CatalogoView';
 import CmvView from './features/cmv/CmvView';
-import RelatoriosView from './features/relatorios/RelatoriosView'; // Agora inclui Histórico e Análises
+import RelatoriosView from './features/relatorios/RelatoriosView';
 import OnboardingView from './features/onboarding/OnboardingView';
-import { IconeLogout, IconeCarrinho, IconeFichaTecnica, IconeGrafico, IconeDashboard, IconeAnalises, IconeConfiguracoes } from './utils/icons'; // Corrigido '=>' para 'from'
+import FluxoCaixaView from './features/fluxoCaixa/FluxoCaixaView'; // NOVO
+import { IconeLogout, IconeCarrinho, IconeFichaTecnica, IconeDashboard, IconeAnalises, IconeConfiguracoes, IconeDinheiro } from './utils/icons'; // NOVO
 import './App.css';
 
 const AppContent = () => {
@@ -41,19 +42,20 @@ const AppContent = () => {
         switch (activeTab) {
             case 'dashboard': return userRole === 'gestor' ? <DashboardView /> : <PedidosView />;
             case 'pedidos': return <PedidosView />;
-            case 'catalogo': return <CatalogoView />; // Usar o novo CatalogoView
+            case 'catalogo': return <CatalogoView />;
             case 'cmv': return userRole === 'gestor' ? <CmvView /> : null;
             case 'analises': return userRole === 'gestor' ? <RelatoriosView /> : null;
-            case 'onboarding': return <OnboardingView />; // Manter para acesso direto se necessário
+            case 'financeiro': return userRole === 'gestor' ? <FluxoCaixaView /> : null; // NOVO
+            case 'onboarding': return <OnboardingView />;
             default: return <PedidosView />;
         }
     };
 
     return (
         <div className="App">
-            {modal.isOpen && <Modal title="Aviso" onConfirm={closeModal} confirmText="OK">{modal.message}</Modal>}
+            {modal.isOpen && <Modal title={modal.title || "Aviso"} onConfirm={closeModal} confirmText="OK">{modal.message}</Modal>}
             {confirmationModal.isOpen && (
-                <Modal title="Confirmação" onConfirm={handleConfirmAction} showCancel={true} onCancel={closeConfirmationModal} confirmText="Confirmar">
+                <Modal title={confirmationModal.title || "Confirmação"} onConfirm={handleConfirmAction} showCancel={true} onCancel={closeConfirmationModal} confirmText="Confirmar">
                     {confirmationModal.message}
                 </Modal>
             )}
@@ -76,6 +78,7 @@ const AppContent = () => {
                 {userRole === 'gestor' && (
                     <>
                         <button data-cy="nav-fichas-tecnicas" className={`nav-button ${activeTab === 'cmv' ? 'active' : ''}`} onClick={() => handleTabClick('cmv')}><IconeFichaTecnica /> Fichas Técnicas</button>
+                        <button data-cy="nav-financeiro" className={`nav-button ${activeTab === 'financeiro' ? 'active' : ''}`} onClick={() => handleTabClick('financeiro')}><IconeDinheiro /> Financeiro</button>
                         <button data-cy="nav-analises" className={`nav-button ${activeTab === 'analises' ? 'active' : ''}`} onClick={() => handleTabClick('analises')}><IconeAnalises /> Análises</button>
                     </>
                 )}

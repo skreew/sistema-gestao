@@ -3,14 +3,14 @@ import React, { createContext, useState, useContext } from 'react';
 const UIContext = createContext();
 
 export const UIProvider = ({ children }) => {
-    const [modal, setModal] = useState({ isOpen: false, message: '' });
-    const [confirmationModal, setConfirmationModal] = useState({ isOpen: false, message: '', onConfirm: () => {} });
+    const [modal, setModal] = useState({ isOpen: false, message: '', title: '' });
+    const [confirmationModal, setConfirmationModal] = useState({ isOpen: false, message: '', title: '', onConfirm: () => {} });
 
-    const showModal = (message) => setModal({ isOpen: true, message });
-    const closeModal = () => setModal({ isOpen: false, message: '' });
+    const showModal = (message, title) => setModal({ isOpen: true, message, title });
+    const closeModal = () => setModal({ isOpen: false, message: '', title: '' });
 
-    const showConfirmationModal = (message, onConfirm) => setConfirmationModal({ isOpen: true, message, onConfirm });
-    const closeConfirmationModal = () => setConfirmationModal({ isOpen: false, message: '', onConfirm: () => {} });
+    const showConfirmationModal = (message, onConfirm, title) => setConfirmationModal({ isOpen: true, message, onConfirm, title });
+    const closeConfirmationModal = () => setConfirmationModal({ isOpen: false, message: '', title: '', onConfirm: () => {} });
 
     const handleConfirmAction = () => {
         if (typeof confirmationModal.onConfirm === 'function') {

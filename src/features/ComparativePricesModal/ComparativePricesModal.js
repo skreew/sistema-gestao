@@ -9,7 +9,6 @@ const ComparativePricesModal = ({ item, onSelectPrice, onClose }) => {
     const pricesBySupplier = useMemo(() => {
         if (!item?.historicoPrecos) return [];
         const latestPrices = {};
-        // Pega o preço mais recente de cada fornecedor
         item.historicoPrecos.forEach(rec => {
             if (!latestPrices[rec.fornecedorId] || rec.dataCompra.seconds > latestPrices[rec.fornecedorId].dataCompra.seconds) {
                 latestPrices[rec.fornecedorId] = rec;

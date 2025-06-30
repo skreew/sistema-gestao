@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../context/Auth';
+import { useAuth } from '../../context/AuthContext';
 import { useUI } from '../../context/UIContext';
 import { IconeCaminhao } from '../../utils/icons';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '../../context/Auth';
+import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { IconeCaminhao, IconeCheck, IconeCirculo } from '../../utils/icons';
 
@@ -10,7 +10,7 @@ const OnboardingView = () => {
     const checklist = [
         { text: 'Cadastre seu primeiro fornecedor', isComplete: fornecedores.length > 0 },
         { text: 'Cadastre um item de compra (insumo)', isComplete: produtosDeCompra.length > 0 },
-        { text: 'Registre uma compra para ter um custo', isComplete: produtosDeCompra.some(p => p.bestPrice) },
+        { text: 'Registre uma compra para ter um custo', isComplete: produtosDeCompra.some(p => p.bestPrice != null) },
         { text: 'Crie sua primeira Ficha Técnica', isComplete: produtos.length > 0 },
     ];
     const allComplete = checklist.every(item => item.isComplete);

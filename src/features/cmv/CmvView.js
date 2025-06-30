@@ -16,10 +16,7 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
     const [qtdInsumo, setQtdInsumo] = useState('');
     const [margemLucro, setMargemLucro] = useState(200);
 
-    // Obter o insumo selecionado para acessar suas propriedades
-    const selectedInsumo = useMemo(() => {
-        return produtosDeCompra.find(p => p.id === selectedInsumoId);
-    }, [selectedInsumoId, produtosDeCompra]);
+    const selectedInsumo = useMemo(() => produtosDeCompra.find(p => p.id === selectedInsumoId), [selectedInsumoId, produtosDeCompra]);
 
     const resetForm = () => { setEditing(null); setFormState(initialState); setVarianteAtiva(0); };
 
@@ -51,32 +48,21 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
     const handleAddItem = () => {
         const insumo = produtosDeCompra.find(p => p.id === selectedInsumoId);
         const qtd = parseFloat(String(qtdInsumo).replace(',', '.'));
-        if (!insumo || isNaN(qtd) || qtd <= 0 || !insumo.bestPrice) {
+        if (!insumo || isNaN(qtd) || qtd <= 0 || insumo.bestPrice == null) {
             showModal("Selecione um insumo com preço e quantidade válidos."); return;
         }
 
-        // Determina a unidade de exibição e o fator de conversão
         let displayUnit = insumo.unidadeAnalise;
         let conversionFactor = 1;
 
-        if (insumo.unidadeAnalise === 'kg') {
-            displayUnit = 'g';
-            conversionFactor = 1000; // 1 kg = 1000 g
-        } else if (insumo.unidadeAnalise === 'L') {
-            displayUnit = 'ml';
-            conversionFactor = 1000; // 1 L = 1000 ml
-        }
-        // A quantidade de entrada (qtd) é na unidade de exibição (g, ml, un)
-        // O custo do insumo é por unidade de análise (R$/kg, R$/L, R$/un)
-        // Portanto, para calcular o custo, convertemos a quantidade de volta para a unidade de análise
+        if (insumo.unidadeAnalise === 'kg') { displayUnit = 'g'; conversionFactor = 1000; }
+        else if (insumo.unidadeAnalise === 'L') { displayUnit = 'ml'; conversionFactor = 1000; }
+
         const quantidadeEmUnidadeAnalise = qtd / conversionFactor;
 
         const novoItem = {
-            itemDeCompraId: insumo.id,
-            nome: insumo.nome,
-            quantidade: qtd, // Quantidade na unidade de exibição (g, ml, un)
-            unidade: displayUnit, // Unidade para exibição na ficha (g, ml, un)
-            custo: quantidadeEmUnidadeAnalise * insumo.bestPrice, // Custo calculado
+            itemDeCompraId: insumo.id, nome: insumo.nome, quantidade: qtd,
+            unidade: displayUnit, custo: quantidadeEmUnidadeAnalise * insumo.bestPrice,
         };
         const novasVariantes = [...formState.variantes];
         novasVariantes[varianteAtiva].fichaTecnica.push(novoItem);
@@ -136,21 +122,12 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
                             <label>Insumo</label>
                             <select value={selectedInsumoId} onChange={e => setSelectedInsumoId(e.target.value)} aria-label="Selecione um item de compra">
                                 <option value="">Selecione...</option>
-                                {produtosDeCompra.filter(p => p.bestPrice).map(p => <option key={p.id} value={p.id}>{`${p.nome} - ${formatarValorPreciso(p.bestPrice)}/${p.unidadeAnalise}`}</option>)}
+                                {produtosDeCompra.filter(p => p.bestPrice != null).map(p => <option key={p.id} value={p.id}>{`${p.nome} - ${formatarValorPreciso(p.bestPrice)}/${p.unidadeAnalise}`}</option>)}
                             </select>
-                            {produtosDeCompra.filter(p => p.bestPrice).length === 0 && (
-                                <p className="sub-text">Nenhum insumo com preço para adicionar.</p>
-                            )}
                         </div>
                         <div className="form-group">
                             <label>Qtd ({selectedInsumo ? (selectedInsumo.unidadeAnalise === 'kg' ? 'g' : (selectedInsumo.unidadeAnalise === 'L' ? 'ml' : 'un')) : 'un'})</label>
-                            <input
-                                type="text"
-                                value={qtdInsumo}
-                                onChange={e => setQtdInsumo(e.target.value)}
-                                placeholder={`Ex: 150 ${selectedInsumo ? (selectedInsumo.unidadeAnalise === 'kg' ? 'g' : (selectedInsumo.unidadeAnalise === 'L' ? 'ml' : 'un')) : ''}`}
-                                aria-label="Quantidade do item de compra"
-                            />
+                            <input type="text" value={qtdInsumo} onChange={e => setQtdInsumo(e.target.value)} aria-label="Quantidade do item de compra" />
                         </div>
                         <button type="button" onClick={handleAddItem} className="button-secondary" disabled={!selectedInsumoId || !qtdInsumo} aria-label="Adicionar item à ficha técnica">+</button>
                     </div>
@@ -159,9 +136,6 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
                         {formState.variantes[varianteAtiva].fichaTecnica.map((item, i) => (
                             <div key={i} className="list-item"><p>{item.nome} - {item.quantidade} {item.unidade} ({formatarValor(item.custo)})</p><button type='button' className='button-icon' onClick={() => handleRemoveItem(i)}><IconeLixeira/></button></div>
                         ))}
-                        {formState.variantes[varianteAtiva].fichaTecnica.length === 0 && (
-                            <p className="sub-text">Nenhum insumo adicionado a esta ficha técnica.</p>
-                        )}
                     </div>
                     <p style={{textAlign:'right', fontWeight: 'bold', fontSize: '1.2rem'}}>CMV Total da Variante: {formatarValor(currentCmv)}</p>
                 </div>
@@ -190,7 +164,6 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
                         ))}
                     </div>
                 ))}
-                {produtos.length === 0 && <p className="sub-text">Nenhum produto final cadastrado ainda.</p>}
             </div>
         </div>
     );
@@ -198,7 +171,7 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
 
 const CmvView = () => {
     const { produtosDeCompra } = useData();
-    const isDisabled = !produtosDeCompra.some(item => item.bestPrice); 
+    const isDisabled = !produtosDeCompra.some(item => item.bestPrice != null); 
 
     return (
         <div>

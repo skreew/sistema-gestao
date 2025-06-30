@@ -1,7 +1,13 @@
 import { db } from '../firebase';
-import { collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
-export const addDocument = (collectionName, data) => addDoc(collection(db, collectionName), { ...data, criadoEm: serverTimestamp() });
+// O parâmetro 'addTimestamp' controla se o campo 'criadoEm' deve ser adicionado.
+// Útil para coleções como fluxo de caixa onde a data é manual.
+export const addDocument = (collectionName, data, addTimestamp = true) => {
+    const dataToSave = addTimestamp ? { ...data, criadoEm: serverTimestamp() } : data;
+    return addDoc(collection(db, collectionName), dataToSave);
+};
+
 export const updateDocument = (collectionName, docId, data) => updateDoc(doc(db, collectionName, docId), { ...data, atualizadoEm: serverTimestamp() });
 export const deleteDocument = (collectionName, docId) => deleteDoc(doc(db, collectionName, docId));
 export const setDocument = (collectionName, docId, data) => setDoc(doc(db, collectionName, docId), { ...data, atualizadoEm: serverTimestamp() }, { merge: true });

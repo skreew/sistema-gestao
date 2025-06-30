@@ -1,7 +1,7 @@
 import React from 'react';
 import { IconeAnalises } from '../../utils/icons';
 import AnaliseDeCustoInsumo from './AnaliseDeCustoInsumo';
-import HistoricoView from './HistoricoView'; // Agora HistoricoView é um subcomponente aqui
+import HistoricoView from './HistoricoView';
 
 const RelatoriosView = () => {
     return (

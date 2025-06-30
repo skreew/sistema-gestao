@@ -3,8 +3,9 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 
+// ATENÇÃO: Substitua pelas suas credenciais do Firebase
+// É altamente recomendável usar variáveis de ambiente (.env) para armazenar essas chaves.
 const firebaseConfig = {
-  // ATENÇÃO: Substitua pelas suas credenciais do Firebase
   apiKey: "AIzaSyDrROaFFo6xjrkn4FhKWdY1c4Z0Jyy6SNw",
   authDomain: "sistema-gestao-1a0cd.firebaseapp.com",
   projectId: "sistema-gestao-1a0cd",
