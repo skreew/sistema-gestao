@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
                     setUserRole(data.role);
                     setUserProfile(data);
                 } else {
-                    // Se o doc não existe no Firestore, desloga para segurança
+                    console.error("Utilizador autenticado mas sem dados no Firestore. A fazer logout.");
                     await signOut(auth);
                 }
             } else {

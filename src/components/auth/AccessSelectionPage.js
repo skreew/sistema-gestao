@@ -1,76 +1,83 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/Auth';
 import { useUI } from '../../context/UIContext';
 import { IconeCaminhao } from '../../utils/icons';
+import InputField from '../ui/forms/InputField';
 
 function getFriendlyAuthError(errorCode) {
     switch (errorCode) {
-        case 'auth/email-already-in-use': return 'Este e-mail já foi cadastrado.';
-        case 'auth/invalid-email': return 'O formato do e-mail é inválido.';
-        case 'auth/weak-password': return 'A senha é muito fraca. Use pelo menos 6 caracteres.';
-        case 'auth/user-not-found': case 'auth/wrong-password': return 'E-mail ou senha inválidos.';
-        default: return 'Ocorreu um erro. Tente novamente mais tarde.';
+        case 'auth/invalid-credential':
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+            return 'E-mail ou palavra-passe inválidos.';
+        case 'auth/invalid-email':
+            return 'O formato do e-mail é inválido.';
+        default:
+            return 'Ocorreu um erro. Verifique a sua conexão e as credenciais do Firebase.';
     }
 }
 
 const AccessSelectionPage = () => {
-    const [view, setView] = useState('selection');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const { loginUser, registerUser } = useAuth();
-    const { showModal } = useUI();
+    const [isSaving, setIsSaving] = useState(false);
+    const [formErrors, setFormErrors] = useState({});
+
+    const { loginUser } = useAuth();
+    const { showToast } = useUI();
+
+    const validateLoginForm = () => {
+        const errors = {};
+        if (!email) errors.email = "O e-mail é obrigatório.";
+        if (!password) errors.password = "A palavra-passe é obrigatória.";
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        try { await loginUser(email, password); } catch (error) { showModal(getFriendlyAuthError(error.code)); }
-    };
-
-    const handleRegister = async (e) => {
-        e.preventDefault();
+        if (!validateLoginForm()) return;
+        setIsSaving(true);
         try {
-            // Por padrão, novos registros são 'colaborador'. Gestores são criados/promovidos manualmente.
-            await registerUser(email, password, 'colaborador');
-            showModal("Cadastro realizado com sucesso!");
-        } catch (error) { showModal(getFriendlyAuthError(error.code)); }
-    };
-
-    const renderContent = () => {
-        switch (view) {
-            case 'login': return (
-                <form onSubmit={handleLogin}>
-                    <h3>Acessar o Sistema</h3>
-                    <div className="form-group"><input data-cy="input-email-login" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail" required /></div>
-                    <div className="form-group"><input data-cy="input-senha-login" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Senha" required /></div>
-                    <button data-cy="btn-login-submit" type="submit" className="button-primary" style={{width: '100%'}}>Entrar</button>
-                    <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
-                </form>
-            );
-            case 'register': return (
-                <form onSubmit={handleRegister}>
-                    <h3>Registrar Novo Colaborador</h3>
-                    <div className="form-group"><input data-cy="input-email-registro" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail" required /></div>
-                    <div className="form-group"><input data-cy="input-senha-registro" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Senha (mínimo 6 caracteres)" required /></div>
-                    <button data-cy="btn-register-submit" type="submit" className="button-primary" style={{width: '100%'}}>Registrar</button>
-                    <button type="button" onClick={() => setView('selection')} className="button-link">Voltar</button>
-                </form>
-            );
-            default: return (
-                <>
-                    <p>Bem-vindo!</p>
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem'}}>
-                        <button data-cy="btn-show-login" onClick={() => setView('login')} className="button-primary large">Entrar</button>
-                        <button data-cy="btn-show-register" onClick={() => setView('register')} className="button-secondary large">Registrar Novo Colaborador</button>
-                    </div>
-                </>
-            );
+            await loginUser(email, password);
+            // O login bem-sucedido irá redirecionar automaticamente através do AuthProvider
+        } catch (error) {
+            showToast(getFriendlyAuthError(error.code), 'error');
+        } finally {
+            setIsSaving(false);
         }
     };
 
     return (
         <div className="login-container">
             <div className="login-card card">
-                <h1><IconeCaminhao /> Sistema de Pedidos</h1>
-                {renderContent()}
+                <h1><IconeCaminhao /> Sistema de Gestão</h1>
+                <form onSubmit={handleLogin}>
+                    <h3>Aceder ao Sistema</h3>
+                    <InputField
+                        data-cy="input-email-login"
+                        label="E-mail"
+                        type="email"
+                        value={email}
+                        onChange={e => { setEmail(e.target.value); setFormErrors(prev => ({ ...prev, email: '' })); }}
+                        placeholder="seu-email@exemplo.com"
+                        required
+                        error={formErrors.email}
+                    />
+                    <InputField
+                        data-cy="input-senha-login"
+                        label="Palavra-passe"
+                        type="password"
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); setFormErrors(prev => ({ ...prev, password: '' })); }}
+                        placeholder="Sua palavra-passe"
+                        required
+                        error={formErrors.password}
+                    />
+                    <button data-cy="btn-login-submit" type="submit" className="button-primary" style={{width: '100%', marginTop: '1rem'}} disabled={isSaving}>
+                        {isSaving ? 'A entrar...' : 'Entrar'}
+                    </button>
+                </form>
             </div>
         </div>
     );

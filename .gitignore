@@ -20,3 +20,7 @@ yarn-error.log*
 cypress.env.json
 cypress/videos/
 cypress/screenshots/
+
+# Test reports
+/coverage
+/test-results

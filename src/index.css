@@ -1,22 +1,18 @@
-:root {
-  --cor-primaria: #0033a0;
-  --cor-secundaria: #ffde00;
-  --cor-sucesso: #009e4d;
-  --cor-perigo: #d93025;
-  --cor-fundo: #f8f9fa;
-  --cor-texto: #212529;
-  --cor-borda: #dee2e6;
-  --sombra-card: 0 4px 8px rgba(0, 0, 0, 0.05);
-}
+/* Importa a fonte Inter do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--cor-fundo);
-  color: var(--cor-texto);
-  line-height: 1.6;
 }
-* { box-sizing: border-box; }
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}

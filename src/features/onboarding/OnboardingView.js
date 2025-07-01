@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/Auth';
 import { useData } from '../../context/DataContext';
 import { IconeCaminhao, IconeCheck, IconeCirculo } from '../../utils/icons';
 
@@ -8,10 +8,10 @@ const OnboardingView = () => {
     const { fornecedores, produtosDeCompra, produtos } = useData();
 
     const checklist = [
-        { text: 'Cadastre seu primeiro fornecedor', isComplete: fornecedores.length > 0 },
-        { text: 'Cadastre um item de compra (insumo)', isComplete: produtosDeCompra.length > 0 },
-        { text: 'Registre uma compra para ter um custo', isComplete: produtosDeCompra.some(p => p.bestPrice != null) },
-        { text: 'Crie sua primeira Ficha Técnica', isComplete: produtos.length > 0 },
+        { text: 'Registar o seu primeiro fornecedor', isComplete: fornecedores.length > 0 },
+        { text: 'Registar um item de compra (insumo)', isComplete: produtosDeCompra.length > 0 },
+        { text: 'Registar uma compra para ter um custo', isComplete: produtosDeCompra.some(p => p.bestPrice) },
+        { text: 'Criar a sua primeira Ficha Técnica', isComplete: produtos.length > 0 },
     ];
     const allComplete = checklist.every(item => item.isComplete);
 
@@ -31,7 +31,7 @@ const OnboardingView = () => {
                         </li>
                     ))}
                 </ul>
-                <button onClick={() => updateOnboardingStatus(user.uid, true)} className="button-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={!allComplete}>
+                <button onClick={() => updateOnboardingStatus(user.uid, true)} className="button-primary btn-full-width" style={{ marginTop: '1rem' }} disabled={!allComplete}>
                     {allComplete ? "Vamos Começar!" : "Complete os passos para continuar"}
                 </button>
             </div>

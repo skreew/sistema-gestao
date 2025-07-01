@@ -1,6 +1,6 @@
-# Sistema de Pedidos e Gestão v1.3 (Refatorado com Fluxo de Caixa)
+# Sistema de Gestão Empresarial v2.0 (Versão Final Consolidada)
 
-Aplicação React completa para gestão de pedidos, fornecedores, catálogo, CMV e agora com um **mini fluxo de caixa**, com fluxos de trabalho otimizados e corrigidos para maior intuitividade e estabilidade.
+Aplicação React completa para gestão de pedidos, fornecedores, catálogo, cálculo de Custo de Mercadoria Vendida (CMV), fluxo de caixa, gestão de estoque e ponto de venda (PDV). Esta versão foi refatorada para máxima usabilidade, robustez e escalabilidade.
 
 ## Como Iniciar
 
@@ -9,34 +9,23 @@ Aplicação React completa para gestão de pedidos, fornecedores, catálogo, CMV
     npm install
     ```
 
-2.  **Configure o Firebase:**
-    Abra o arquivo `src/firebase.js` e preencha com as suas credenciais do Firebase.
+2.  **Configure o Firebase (OBRIGATÓRIO):**
+    Abra o ficheiro `src/firebase.js` e preencha com as suas credenciais **reais** do Firebase.
 
-3.  **Crie os Índices no Firestore:**
-    Para que as consultas e ordenações funcionem, você **precisa** criar os seguintes índices no seu console do Firestore. A falta deles causará erros na aplicação.
+3.  **Configure as Regras de Segurança e Funções (CRÍTICO PARA PRODUÇÃO):**
+    * **Firestore Security Rules:** A segurança da sua aplicação depende disso. As regras padrão são inseguras. Adapte as regras sugeridas no `README.md` original ou crie as suas próprias baseadas na sua lógica de negócio (ex: apenas 'gestores' podem apagar dados).
+    * **Cloud Functions:** Para automações essenciais como baixa de estoque após uma venda no PDV, recálculo automático de CMV e lançamento de despesas, é altamente recomendável implementar Cloud Functions. O ficheiro `src/services/firestoreService.js` contém comentários sobre as funções recomendadas.
 
-    - **Coleção:** `pedidosRealizados`
-      - **Campo:** `criadoEm`, **Modo:** Decrescente
-
-    - **Coleção:** `fornecedores`
-      - **Campo:** `nome`, **Modo:** Crescente
-
-    - **Coleção:** `produtosDeCompra`
-      - **Campo:** `nome`, **Modo:** Crescente
-
-    - **Coleção:** `produtosFinais`
-      - **Campo:** `nome`, **Modo:** Crescente
-
-    - **Grupo de Coleções:** `entradas` (ID do Grupo de Coleções)
-      - **Caminho da coleção:** `fluxoCaixa/{userId}/entradas`
-      - **Campo:** `data`, **Modo:** Decrescente
-
-    - **Grupo de Coleções:** `saidas` (ID do Grupo de Coleções)
-      - **Caminho da coleção:** `fluxoCaixa/{userId}/saidas`
-      - **Campo:** `data`, **Modo:** Decrescente
-
-4.  **Inicie o Servidor de Desenvolvimento:**
+4.  **Inicie a Aplicação:**
     ```bash
     npm start
     ```
-    A aplicação estará disponível em `http://localhost:3000`.
+
+5.  **Execute os Testes (Opcional):**
+    ```bash
+    # Testes unitários
+    npm test
+
+    # Testes End-to-End (requer a aplicação a rodar)
+    npm run cypress:open
+    ```

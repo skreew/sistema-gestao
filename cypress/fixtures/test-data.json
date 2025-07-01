@@ -1,0 +1,58 @@
+{
+  "user": {
+    "email": "admin@gmail.com",
+    "password": "admin123"
+  },
+  "suppliers": [
+    {
+      "name": "Café & Grãos do Sul",
+      "whatsapp": "5511911112222",
+      "observations": "Fornecedor de Cafés para teste"
+    },
+    {
+      "name": "Laticínios da Fazenda",
+      "whatsapp": "5511933334444",
+      "observations": "Fornecedor de Laticínios para teste"
+    },
+    {
+      "name": "EmbalaTudo",
+      "whatsapp": "5511955556666",
+      "observations": "Fornecedor de Embalagens para teste"
+    }
+  ],
+  "supplies": [
+    { "name": "Café em Grãos SM", "unit": "kg", "supplierName": "Café & Grãos do Sul", "purchaseQty": "50", "totalPrice": "100" },
+    { "name": "Leite Integral A", "unit": "L", "supplierName": "Laticínios da Fazenda", "purchaseQty": "20", "totalPrice": "50" },
+    { "name": "Açúcar Refinado", "unit": "kg", "supplierName": "EmbalaTudo", "purchaseQty": "10", "totalPrice": "25" },
+    { "name": "Calda de Caramelo", "unit": "L", "supplierName": "Laticínios da Fazenda", "purchaseQty": "5", "totalPrice": "30" },
+    { "name": "Chocolate em Pó 50%", "unit": "kg", "supplierName": "Café & Grãos do Sul", "purchaseQty": "2", "totalPrice": "20" },
+    { "name": "Copo Descartável 300ml", "unit": "un", "supplierName": "EmbalaTudo", "purchaseQty": "500", "totalPrice": "100" },
+    { "name": "Tampa p/ Copo 300ml", "unit": "un", "supplierName": "EmbalaTudo", "purchaseQty": "500", "totalPrice": "80" }
+  ],
+  "finalProduct": {
+    "name": "Mocha Caramelo",
+    "category": "Especiais",
+    "variant": {
+      "name": "Copo 300ml",
+      "packagingCost": "0",
+      "otherCosts": "1.50"
+    },
+    "recipe": [
+      { "name": "Café em Grãos SM", "qty": "20" },
+      { "name": "Leite Integral A", "qty": "150" },
+      { "name": "Calda de Caramelo", "qty": "15" },
+      { "name": "Chocolate em Pó 50%", "qty": "10" },
+      { "name": "Copo Descartável 300ml", "qty": "1" },
+      { "name": "Tampa p/ Copo 300ml", "qty": "1" }
+    ]
+  },
+  "stockItems": [
+    { "name": "Café em Grãos SM", "unit": "kg", "qty": "2" },
+    { "name": "Leite Integral A", "unit": "L", "qty": "10" }
+  ],
+  "expense": {
+    "value": "50",
+    "category": "Marketing",
+    "description": "Campanha de marketing do mês"
+  }
+}
