@@ -1,45 +1,94 @@
-// Arquivo: firestore.rules (versão com Histórico de Pedidos)
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isGestor() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gestor';
-    }
-
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function isGestor() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gestor';
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
     match /users/{userId} {
-      allow read, write: if isGestor();
-      allow get: if request.auth.uid == userId;
+      allow read: if isSignedIn() && isOwner(userId);
+      allow create: if isGestor();
+      allow update: if isGestor() || (isSignedIn() && isOwner(userId));
     }
 
-    // Acesso liberado para Colaboradores e Gestor
     match /fornecedores/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isGestor() &&
+                          request.resource.data.nome is string &&
+                          request.resource.data.nome.size() > 0 &&
+                          request.resource.data.whatsapp is string &&
+                          request.resource.data.whatsapp.size() > 0;
     }
-    match /produtosDeCompra/{docId} {
-        allow read, write: if isSignedIn();
-    }
-    
-    // --- NOVO ---
-    // Histórico de pedidos pode ser criado e lido por todos
-    match /pedidosRealizados/{docId} {
-        allow read, write: if isSignedIn();
-    }
-    // --- FIM NOVO ---
 
-    // Acesso restrito apenas para Gestores
-    match /insumos/{docId} {
-      allow read, write: if isGestor();
+    match /produtosDeCompra/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isGestor() &&
+                          request.resource.data.nome is string &&
+                          request.resource.data.nome.size() > 0 &&
+                          request.resource.data.unidadeAnalise is string &&
+                          request.resource.data.unidadeAnalise in ['kg', 'L', 'un'];
+
+      match /historicoPrecos/{priceId} {
+        allow read: if isSignedIn();
+        allow write: if isGestor() &&
+                            request.resource.data.tipo is string &&
+                            request.resource.data.tipo in ['compra', 'oferta'] &&
+                            request.resource.data.fornecedorId is string &&
+                            (request.resource.data.dataCompra is timestamp || request.resource.data.dataOferta is timestamp) &&
+                            request.resource.data.precoPorUnidadeAnalise is number &&
+                            request.resource.data.precoPorUnidadeAnalise > 0;
+      }
     }
-    match /produtos/{docId} {
-      allow read, write: if isGestor();
+
+    match /produtosFinais/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isGestor() &&
+                          request.resource.data.nome is string &&
+                          request.resource.data.nome.size() > 0 &&
+                          request.resource.data.variantes is list &&
+                          request.resource.data.variantes.size() > 0 &&
+                          request.resource.data.variantes.all(v =>
+                              v.nomeVariante is string && v.nomeVariante.size() > 0 &&
+                              v.custoEmbalagem is number && v.custoEmbalagem >= 0 &&
+                              v.custoOperacional is number && v.custoOperacional >= 0 &&
+                              v.fichaTecnica is list
+                          );
+    }
+
+    match /pedidosRealizados/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isGestor();
+      allow update: if isGestor();
+    }
+
+    match /vendas/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isGestor();
+      allow delete: if isGestor();
+    }
+
+    match /faturamento/{docId} {
+      allow read, write: if isGestor() &&
+                                  request.resource.data.valor is number && request.resource.data.valor > 0 &&
+                                  request.resource.data.data is timestamp;
+    }
+
+    match /despesas/{docId} {
+      allow read, write: if isGestor() &&
+                                  request.resource.data.valor is number && request.resource.data.valor > 0 &&
+                                  request.resource.data.data is timestamp &&
+                                  request.resource.data.categoria is string && request.resource.data.categoria.size() > 0;
     }
   }
 }

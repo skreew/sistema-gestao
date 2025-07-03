@@ -1,31 +1,44 @@
-# Sistema de Gestão Empresarial v2.0 (Versão Final Consolidada)
+# Sistema de Gestão Empresarial v6.0 (Versão Profissional)
 
-Aplicação React completa para gestão de pedidos, fornecedores, catálogo, cálculo de Custo de Mercadoria Vendida (CMV), fluxo de caixa, gestão de estoque e ponto de venda (PDV). Esta versão foi refatorada para máxima usabilidade, robustez e escalabilidade.
+Aplicação React refatorada para maior segurança, performance e manutenibilidade, utilizando React Router para navegação e variáveis de ambiente para as chaves de API.
+
+## Funcionalidades Principais
+
+- Dashboard: Visão geral e rápida dos indicadores do negócio.
+- Vendas: Histórico de todas as vendas realizadas.
+- Pedidos de Compra: Crie e envie pedidos para os seus fornecedores.
+- Catálogo: Gestão centralizada de fornecedores e insumos (matérias-primas).
+- Fichas Técnicas: Calcule o Custo de Mercadoria Vendida (CMV) de forma precisa para cada produto.
+- Fluxo de Caixa: Controle todas as entradas e saídas financeiras.
+- Análises e Relatórios: Compare preços de insumos e visualize históricos.
+- Gestão de Utilizadores: Adicione e gira os acessos de colaboradores e gestores.
 
 ## Como Iniciar
 
-1.  **Instale as Dependências:**
+1.  Criar Ficheiro de Ambiente (OBRIGATÓRIO):
+    - Na raiz do projeto (`sistema-gestao-final`), crie um ficheiro chamado `.env.local`.
+    - Copie o conteúdo do ficheiro `.env.example` para o `.env.local` e substitua pelas suas credenciais **reais** do Firebase.
+
+2.  Instale as Dependências:
+
     ```bash
     npm install
     ```
 
-2.  **Configure o Firebase (OBRIGATÓRIO):**
-    Abra o ficheiro `src/firebase.js` e preencha com as suas credenciais **reais** do Firebase.
+3.  Inicie a Aplicação:
 
-3.  **Configure as Regras de Segurança e Funções (CRÍTICO PARA PRODUÇÃO):**
-    * **Firestore Security Rules:** A segurança da sua aplicação depende disso. As regras padrão são inseguras. Adapte as regras sugeridas no `README.md` original ou crie as suas próprias baseadas na sua lógica de negócio (ex: apenas 'gestores' podem apagar dados).
-    * **Cloud Functions:** Para automações essenciais como baixa de estoque após uma venda no PDV, recálculo automático de CMV e lançamento de despesas, é altamente recomendável implementar Cloud Functions. O ficheiro `src/services/firestoreService.js` contém comentários sobre as funções recomendadas.
-
-4.  **Inicie a Aplicação:**
     ```bash
     npm start
     ```
 
-5.  **Execute os Testes (Opcional):**
-    ```bash
-    # Testes unitários
-    npm test
+4.  Configure as Regras de Segurança do Firestore:
+    - Vá ao seu painel do Firebase > Firestore Database > Rules.
+    - Copie o conteúdo do ficheiro `firestore.rules` (na raiz do projeto) e cole no editor de regras do Firebase.
+    - Clique em "Publicar".
 
-    # Testes End-to-End (requer a aplicação a rodar)
-    npm run cypress:open
-    ```
+5.  Primeiro Acesso:
+    - No painel de 'Authentication' do seu projeto Firebase, crie manualmente o seu primeiro utilizador (será o gestor principal).
+    - Na base de dados 'Firestore', crie uma coleção chamada 'users'.
+    - Dentro de 'users', crie um documento com o mesmo UID do utilizador que criou.
+    - Dentro desse documento, adicione um campo 'role' (string) com o valor 'gestor'.
+    - Agora, aceda à aplicação (http://localhost:3000) com as credenciais do gestor que criou.

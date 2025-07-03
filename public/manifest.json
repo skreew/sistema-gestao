@@ -1,1 +1,8 @@
-{"short_name":"GestãoPRO","name":"Sistema de Gestão PRO","start_url":".","display":"standalone","theme_color":"#000000","background_color":"#ffffff"}
+{
+  "short_name": "GestãoPRO",
+  "name": "Sistema de Gestão PRO",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}

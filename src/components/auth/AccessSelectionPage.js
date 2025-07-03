@@ -1,86 +1,95 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/Auth';
 import { useUI } from '../../context/UIContext';
-import { IconeCaminhao } from '../../utils/icons';
+import { IconeUsers } from '../../utils/icons';
 import InputField from '../ui/forms/InputField';
 
-function getFriendlyAuthError(errorCode) {
-    switch (errorCode) {
-        case 'auth/invalid-credential':
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-            return 'E-mail ou palavra-passe inválidos.';
-        case 'auth/invalid-email':
-            return 'O formato do e-mail é inválido.';
-        default:
-            return 'Ocorreu um erro. Verifique a sua conexão e as credenciais do Firebase.';
-    }
-}
-
 const AccessSelectionPage = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
-    const [formErrors, setFormErrors] = useState({});
+  const { loginUser } = useAuth();
+  const { showToast } = useUI();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
-    const { loginUser } = useAuth();
-    const { showToast } = useUI();
+  const validateForm = () => {
+    const errors = {};
+    if (!email) errors.email = 'E-mail é obrigatório.';
+    if (!password) errors.password = 'Senha é obrigatória.';
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-    const validateLoginForm = () => {
-        const errors = {};
-        if (!email) errors.email = "O e-mail é obrigatório.";
-        if (!password) errors.password = "A palavra-passe é obrigatória.";
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
-    };
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        if (!validateLoginForm()) return;
-        setIsSaving(true);
-        try {
-            await loginUser(email, password);
-            // O login bem-sucedido irá redirecionar automaticamente através do AuthProvider
-        } catch (error) {
-            showToast(getFriendlyAuthError(error.code), 'error');
-        } finally {
-            setIsSaving(false);
-        }
-    };
+    setIsLoggingIn(true);
+    try {
+      await loginUser(email, password);
+      showToast('Login bem-sucedido!');
+    } catch (error) {
+      let errorMessage = 'Erro ao fazer login. Verifique suas credenciais.';
+      if (
+        error.code === 'auth/user-not-found' ||
+        error.code === 'auth/wrong-password'
+      ) {
+        errorMessage = 'E-mail ou senha inválidos.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Formato de e-mail inválido.';
+      }
+      showToast(errorMessage, 'error');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
-    return (
-        <div className="login-container">
-            <div className="login-card card">
-                <h1><IconeCaminhao /> Sistema de Gestão</h1>
-                <form onSubmit={handleLogin}>
-                    <h3>Aceder ao Sistema</h3>
-                    <InputField
-                        data-cy="input-email-login"
-                        label="E-mail"
-                        type="email"
-                        value={email}
-                        onChange={e => { setEmail(e.target.value); setFormErrors(prev => ({ ...prev, email: '' })); }}
-                        placeholder="seu-email@exemplo.com"
-                        required
-                        error={formErrors.email}
-                    />
-                    <InputField
-                        data-cy="input-senha-login"
-                        label="Palavra-passe"
-                        type="password"
-                        value={password}
-                        onChange={e => { setPassword(e.target.value); setFormErrors(prev => ({ ...prev, password: '' })); }}
-                        placeholder="Sua palavra-passe"
-                        required
-                        error={formErrors.password}
-                    />
-                    <button data-cy="btn-login-submit" type="submit" className="button-primary" style={{width: '100%', marginTop: '1rem'}} disabled={isSaving}>
-                        {isSaving ? 'A entrar...' : 'Entrar'}
-                    </button>
-                </form>
-            </div>
-        </div>
-    );
+  return (
+    <div className="login-container">
+      <div className="login-card card">
+        <h1>
+          <IconeUsers className="text-cor-primaria" /> Sistema de Gestão
+        </h1>
+        <p className="text-gray-600 mb-8">Faça login para acessar o sistema.</p>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <InputField
+            label="E-mail"
+            type="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setFormErrors((prev) => ({ ...prev, email: '' }));
+            }}
+            placeholder="seu.email@exemplo.com"
+            required
+            error={formErrors.email}
+            icon={IconeUsers}
+          />
+          {/* Reutilizando IconeUsers para senha para simplicidade, pode ser alterado para um ícone de cadeado se disponível */}
+          <InputField
+            label="Senha"
+            type="password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setFormErrors((prev) => ({ ...prev, password: '' }));
+            }}
+            placeholder="Sua senha"
+            required
+            error={formErrors.password}
+            icon={IconeUsers}
+          />
+          <button
+            type="submit"
+            className="button-primary w-full py-3 text-lg"
+            disabled={isLoggingIn}
+          >
+            {isLoggingIn ? 'Acessando...' : 'Entrar'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 export default AccessSelectionPage;
