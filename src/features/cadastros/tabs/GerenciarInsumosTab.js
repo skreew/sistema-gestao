@@ -14,11 +14,9 @@ import {
   IconeLixeira,
   IconeCarrinho,
 } from '../../../utils/icons';
-import { formatarValorPreciso } from '../../../utils/formatters';
+import { formatarValor } from '../../../utils/formatters';
 import InputField from '../../../components/ui/forms/InputField';
 import SelectField from '../../../components/ui/forms/SelectField';
-// import { useNavigate } from 'react-router-dom'; // Removido import não utilizado
-// import { PATHS } from '../../../constants/paths'; // Removido import não utilizado
 
 const GerenciarInsumosTab = ({ setActiveTab }) => {
   const { showConfirmationModal, showToast } = useUI();
@@ -33,7 +31,6 @@ const GerenciarInsumosTab = ({ setActiveTab }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
-  // const navigate = useNavigate(); // Removida variável não utilizada
   const nomeInsumoInputRef = useRef(null);
 
   useEffect(() => {
@@ -134,16 +131,12 @@ const GerenciarInsumosTab = ({ setActiveTab }) => {
     setFormErrors({});
   };
 
-  const handleRegisterPurchaseClick = (insumoId) => {
-    setActiveTab('registrarCompra');
-  };
-
   return (
     <div className="card">
       <h3>
         <IconeCaixa /> Gerenciar Insumos
       </h3>
-      <form onSubmit={handleSaveInsumo}>
+      <form onSubmit={handleSaveInsumo} noValidate>
         <InputField
           label="Nome do Insumo"
           type="text"
@@ -215,7 +208,7 @@ const GerenciarInsumosTab = ({ setActiveTab }) => {
                   >
                     Melhor Preço:{' '}
                     <strong>
-                      {formatarValorPreciso(p.bestPrice)}/{p.unidadeAnalise}
+                      {formatarValor(p.bestPrice)}/{p.unidadeAnalise}
                     </strong>{' '}
                     (Fornecedor: {p.bestPriceFornecedorName})
                   </p>
@@ -240,7 +233,7 @@ const GerenciarInsumosTab = ({ setActiveTab }) => {
                 </button>
                 <button
                   className="button-icon"
-                  onClick={() => handleRegisterPurchaseClick(p.id)}
+                  onClick={() => setActiveTab('registrarCompra')}
                   aria-label={`Registrar compra para ${p.nome}`}
                   title="Registrar Compra"
                 >

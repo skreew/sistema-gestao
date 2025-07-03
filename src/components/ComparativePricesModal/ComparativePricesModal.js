@@ -11,8 +11,8 @@ const ComparativePricesModal = ({ item, onSelectPrice, onClose }) => {
     if (!item?.historicoPrecos) return [];
     const latestPrices = {};
     item.historicoPrecos.forEach((rec) => {
-      const recordDate =
-        rec.tipo === 'compra' ? rec.dataCompra : rec.dataOferta;
+      // --- CORREÇÃO APLICADA AQUI ---
+      const recordDate = rec.data;
       const timestamp = recordDate.seconds
         ? recordDate.seconds
         : recordDate instanceof Date
@@ -44,14 +44,15 @@ const ComparativePricesModal = ({ item, onSelectPrice, onClose }) => {
       <div className="list-container" style={{ maxHeight: '300px' }}>
         {pricesBySupplier.length > 0 ? (
           pricesBySupplier.map((price) => (
-            <div key={price.id} className="list-item">
+            <div key={price.id || price.fornecedorId} className="list-item">
               <div>
                 <p>
                   <strong>{price.fornecedorNome}</strong>
                 </p>
                 <p className="sub-text">
                   Última {price.tipo === 'compra' ? 'compra' : 'oferta'}:{' '}
-                  {formatarData(price.dataCompra || price.dataOferta)}
+                  {/* --- CORREÇÃO APLICADA AQUI --- */}
+                  {formatarData(price.data)}
                 </p>
               </div>
               <div style={{ textAlign: 'right' }}>

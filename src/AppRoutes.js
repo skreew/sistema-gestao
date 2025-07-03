@@ -26,124 +26,82 @@ const AppRoutes = () => {
   const { user, userRole, loadingAuth, userProfile } = useAuth();
   const { loadingData } = useData();
 
-  if (loadingAuth || loadingData) {
+  if (loadingAuth) {
     return <LoadingScreen />;
   }
 
-  const isAuthenticated = !!user;
-  const isOnboardingComplete = userProfile?.onboardingComplete;
-
-  const ProtectedRoute = ({ children, allowedRoles }) => {
-    if (!isAuthenticated) {
+  // O componente ProtectedRoute agora lida com todos os redirecionamentos
+  const ProtectedRoute = ({ children, allowedRoles, isPublic = false }) => {
+    // Se a rota não for pública e o usuário não estiver logado, redireciona para o login
+    if (!isPublic && !user) {
       return <Navigate to={PATHS.LOGIN} replace />;
     }
-    if (userRole === ROLES.GESTOR && !isOnboardingComplete) {
+
+    // Se o usuário estiver logado e tentar acessar a página de login, redireciona para o dashboard
+    if (isPublic && user) {
+      return <Navigate to={PATHS.DASHBOARD} replace />;
+    }
+
+    // Lógica de onboarding: se o gestor não completou e não está na página de onboarding, redireciona pra lá
+    if (
+      user &&
+      userRole === ROLES.GESTOR &&
+      !userProfile?.onboardingComplete &&
+      window.location.pathname !== PATHS.ONBOARDING
+    ) {
       return <Navigate to={PATHS.ONBOARDING} replace />;
     }
-    if (allowedRoles && !allowedRoles.includes(userRole)) {
-      return <Navigate to={PATHS.DASHBOARD} replace />; // Redirecionar para o dashboard se não autorizado
+
+    // Se o usuário logado não tiver o perfil permitido para a rota, redireciona para o dashboard
+    if (allowedRoles && user && !allowedRoles.includes(userRole)) {
+      return <Navigate to={PATHS.DASHBOARD} replace />;
     }
+
+    // Se passou por todas as verificações, renderiza a página solicitada
     return children;
   };
 
   return (
     <Router>
       <Routes>
-        <Route path={PATHS.LOGIN} element={<AccessSelectionPage />} />
-
-        {/* Rotas protegidas que usam o MainLayout */}
-        <Route element={<MainLayout />}>
-          <Route
-            path={PATHS.DASHBOARD}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR]}>
-                <DashboardView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={PATHS.VENDAS}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR]}>
-                <VendasView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={PATHS.PEDIDOS}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR, ROLES.COLABORADOR]}>
-                <PedidosView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={PATHS.CATALOGO}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR, ROLES.COLABORADOR]}>
-                <CatalogoView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={PATHS.CMV}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR]}>
-                <CmvView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={PATHS.FLUXO_CAIXA}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR]}>
-                <FluxoDeCaixaView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={PATHS.ANALISES}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR]}>
-                <RelatoriosView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={PATHS.GESTAO_UTILIZADORES}
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.GESTOR]}>
-                <UserManagementView />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
-
-        {/* Rota de Onboarding (específica para gestores que não completaram o onboarding) */}
+        {/* Rota de Login */}
         <Route
-          path={PATHS.ONBOARDING}
+          path={PATHS.LOGIN}
           element={
-            <ProtectedRoute allowedRoles={[ROLES.GESTOR]}>
-              <OnboardingView />
+            <ProtectedRoute isPublic={true}>
+              <AccessSelectionPage />
             </ProtectedRoute>
           }
         />
 
-        {/* Redirecionamento padrão para o dashboard após login ou para a página de login */}
+        {/* Rotas Protegidas (que precisam de login) */}
         <Route
-          path="*"
           element={
-            isAuthenticated &&
-            userRole === ROLES.GESTOR &&
-            !isOnboardingComplete ? (
-              <Navigate to={PATHS.ONBOARDING} replace />
-            ) : isAuthenticated ? (
-              <Navigate to={PATHS.DASHBOARD} replace />
-            ) : (
-              <Navigate to={PATHS.LOGIN} replace />
-            )
+            <ProtectedRoute>
+              {/* O MainLayout só será renderizado se o usuário estiver logado */}
+              {/* E a tela de loading de dados é mostrada aqui para não travar o app */}
+              {loadingData ? <LoadingScreen /> : <MainLayout />}
+            </ProtectedRoute>
           }
-        />
+        >
+          {/* Rotas que aparecem dentro do Layout Principal */}
+          <Route path={PATHS.DASHBOARD} element={<DashboardView />} />
+          <Route path={PATHS.VENDAS} element={<VendasView />} />
+          <Route path={PATHS.PEDIDOS} element={<PedidosView />} />
+          <Route path={PATHS.CATALOGO} element={<CatalogoView />} />
+          <Route path={PATHS.CMV} element={<CmvView />} />
+          <Route path={PATHS.FLUXO_CAIXA} element={<FluxoDeCaixaView />} />
+          <Route path={PATHS.ANALISES} element={<RelatoriosView />} />
+          <Route
+            path={PATHS.GESTAO_UTILIZADORES}
+            element={<UserManagementView />}
+          />
+          {/* A rota de onboarding agora está aqui dentro, para ter o menu lateral */}
+          <Route path={PATHS.ONBOARDING} element={<OnboardingView />} />
+        </Route>
+
+        {/* Redirecionamento Padrão */}
+        <Route path="*" element={<Navigate to={PATHS.DASHBOARD} />} />
       </Routes>
     </Router>
   );

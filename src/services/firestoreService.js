@@ -11,6 +11,7 @@ import {
   where,
   getDocs,
   runTransaction,
+  limit,
 } from 'firebase/firestore';
 
 export const addDocument = (collectionName, data) =>
@@ -18,19 +19,25 @@ export const addDocument = (collectionName, data) =>
     ...data,
     criadoEm: serverTimestamp(),
   });
+
 export const updateDocument = (collectionName, docId, data) =>
   updateDoc(doc(db, collectionName, docId), {
     ...data,
     atualizadoEm: serverTimestamp(),
   });
+
 export const deleteDocument = (collectionName, docId) =>
   deleteDoc(doc(db, collectionName, docId));
+
 export const setDocument = (collectionName, docId, data) =>
   setDoc(
     doc(db, collectionName, docId),
     { ...data, atualizadoEm: serverTimestamp() },
     { merge: true },
   );
+
+// --- FUNÇÃO ADICIONADA AQUI ---
+// Adiciona um documento a uma subcoleção
 export const addDocumentToSubcollection = (parent, parentId, sub, data) =>
   addDoc(collection(db, parent, parentId, sub), {
     ...data,
@@ -43,15 +50,29 @@ export const checkIfDocumentExists = async (
   value,
   excludeId = null,
 ) => {
-  const q = query(collection(db, collectionName), where(field, '==', value));
-  const querySnapshot = await getDocs(q);
-  let exists = false;
-  querySnapshot.forEach((doc) => {
-    if (doc.id !== excludeId) {
-      exists = true;
+  try {
+    const q = query(
+      collection(db, collectionName),
+      where(field, '==', value),
+      limit(1),
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return false;
     }
-  });
-  return exists;
+
+    const foundDocId = querySnapshot.docs[0].id;
+    if (excludeId && foundDocId === excludeId) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Erro ao verificar existência do documento:', error);
+    return true;
+  }
 };
 
 export const addPurchaseTransaction = async (

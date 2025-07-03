@@ -1,16 +1,18 @@
-import React, { useState, useMemo } from 'react'; // Removido import useEffect não utilizado
+import React, { useState, useMemo } from 'react';
 import { useUI } from '../../../context/UIContext';
 import { useData } from '../../../context/DataContext';
 import {
-  // addDocumentToSubcollection, // Removido import não utilizado
   addDocument,
   addPurchaseTransaction,
+  checkIfDocumentExists,
 } from '../../../services/firestoreService';
-import { formatarValorPreciso } from '../../../utils/formatters';
+// A importação de formatarData foi removida, e a de formatarValor foi mantida.
+import { formatarValor, formatarValorPreciso } from '../../../utils/formatters';
 import Modal from '../../../components/ui/Modal';
 import InputField from '../../../components/ui/forms/InputField';
 import SelectField from '../../../components/ui/forms/SelectField';
 
+// O componente QuickAddFornecedorModal continua o mesmo, já está correto.
 const QuickAddFornecedorModal = ({ onClose, onFornecedorAdded }) => {
   const [nome, setNome] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -18,25 +20,39 @@ const QuickAddFornecedorModal = ({ onClose, onFornecedorAdded }) => {
   const [formErrors, setFormErrors] = useState({});
   const { showToast } = useUI();
 
-  const validateForm = () => {
+  const validateForm = async () => {
     const errors = {};
+    const numeroLimpo = whatsapp.replace(/\D/g, '');
+
     if (!nome.trim()) errors.nome = 'O nome é obrigatório.';
-    if (!whatsapp.trim()) errors.whatsapp = 'O WhatsApp é obrigatório.';
+    if (!numeroLimpo) errors.whatsapp = 'O WhatsApp é obrigatório.';
+    else {
+      const isDuplicate = await checkIfDocumentExists(
+        'fornecedores',
+        'whatsapp',
+        numeroLimpo,
+      );
+      if (isDuplicate) {
+        errors.whatsapp = 'Este número de WhatsApp já está cadastrado.';
+      }
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
     if (isSaving) return;
 
+    const isValid = await validateForm();
+    if (!isValid) return;
+
     setIsSaving(true);
-    const formattedNumber = whatsapp.replace(/\D/g, '');
+    const numeroLimpo = whatsapp.replace(/\D/g, '');
     try {
       const docRef = await addDocument('fornecedores', {
-        nome,
-        whatsapp: formattedNumber,
+        nome: nome.trim(),
+        whatsapp: numeroLimpo,
         observacoes: null,
       });
       showToast('Fornecedor salvo!');
@@ -50,14 +66,8 @@ const QuickAddFornecedorModal = ({ onClose, onFornecedorAdded }) => {
   };
 
   return (
-    <Modal
-      title="Novo Fornecedor"
-      onConfirm={handleSave}
-      showCancel={true}
-      onCancel={onClose}
-      confirmText="Salvar"
-    >
-      <form onSubmit={handleSave}>
+    <Modal title="Novo Fornecedor" showCancel={true} onCancel={onClose}>
+      <form onSubmit={handleSave} noValidate>
         <InputField
           label="Nome"
           type="text"
@@ -82,14 +92,23 @@ const QuickAddFornecedorModal = ({ onClose, onFornecedorAdded }) => {
           required
           error={formErrors.whatsapp}
         />
-        <button type="submit" className="button-primary" disabled={isSaving}>
-          {isSaving ? 'Salvando...' : 'Salvar'}
-        </button>
+        <div
+          className="modal-actions"
+          style={{ padding: '1rem 0 0 0', justifyContent: 'flex-end' }}
+        >
+          <button type="button" className="button-secondary" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" className="button-primary" disabled={isSaving}>
+            {isSaving ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
       </form>
     </Modal>
   );
 };
 
+// O componente QuickAddInsumoModal também continua o mesmo.
 const QuickAddInsumoModal = ({ onClose, onInsumoAdded }) => {
   const [nome, setNome] = useState('');
   const [unidadeAnalise, setUnidadeAnalise] = useState('kg');
@@ -112,7 +131,7 @@ const QuickAddInsumoModal = ({ onClose, onInsumoAdded }) => {
     setIsSaving(true);
     try {
       const docRef = await addDocument('produtosDeCompra', {
-        nome,
+        nome: nome.trim(),
         unidadeAnalise,
       });
       showToast('Insumo registrado!');
@@ -126,14 +145,8 @@ const QuickAddInsumoModal = ({ onClose, onInsumoAdded }) => {
   };
 
   return (
-    <Modal
-      title="Novo Insumo"
-      onConfirm={handleSave}
-      showCancel={true}
-      onCancel={onClose}
-      confirmText="Salvar"
-    >
-      <form onSubmit={handleSave}>
+    <Modal title="Novo Insumo" showCancel={true} onCancel={onClose}>
+      <form onSubmit={handleSave} noValidate>
         <InputField
           label="Nome do Insumo"
           type="text"
@@ -157,9 +170,17 @@ const QuickAddInsumoModal = ({ onClose, onInsumoAdded }) => {
           ]}
           required
         />
-        <button type="submit" className="button-primary" disabled={isSaving}>
-          {isSaving ? 'Salvando...' : 'Salvar'}
-        </button>
+        <div
+          className="modal-actions"
+          style={{ padding: '1rem 0 0 0', justifyContent: 'flex-end' }}
+        >
+          <button type="button" className="button-secondary" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" className="button-primary" disabled={isSaving}>
+            {isSaving ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
       </form>
     </Modal>
   );
@@ -184,25 +205,15 @@ const RegistrarCompraTab = () => {
     () => produtosDeCompra.find((p) => p.id === purchaseForm.insumoId),
     [produtosDeCompra, purchaseForm.insumoId],
   );
+
   const lastPriceForSelectedInsumo = useMemo(() => {
-    if (
-      !selectedInsumo ||
-      !selectedInsumo.historicoPrecos ||
-      selectedInsumo.historicoPrecos.length === 0
-    )
-      return null;
-    const latestPurchase = selectedInsumo.historicoPrecos
+    if (!selectedInsumo?.historicoPrecos?.length) return null;
+
+    return [...selectedInsumo.historicoPrecos]
       .filter((rec) => rec.tipo === 'compra')
-      .sort((a, b) => {
-        const dateA = a.dataCompra.toDate
-          ? a.dataCompra.toDate()
-          : new Date(a.dataCompra.seconds * 1000);
-        const dateB = b.dataCompra.toDate
-          ? b.dataCompra.toDate()
-          : new Date(b.dataCompra.seconds * 1000);
-        return dateB - dateA;
-      })[0];
-    return latestPurchase;
+      .sort(
+        (a, b) => (b.data.seconds || b.data) - (a.data.seconds || a.data),
+      )[0];
   }, [selectedInsumo]);
 
   const resetPurchaseForm = () => {
@@ -266,7 +277,7 @@ const RegistrarCompraTab = () => {
       const purchaseRecord = {
         tipo: 'compra',
         fornecedorId,
-        dataCompra: new Date(dataCompra),
+        data: new Date(dataCompra),
         precoTotalNota: precoTotal,
         quantidadeComprada: qtd,
         unidadeComprada: selectedInsumo.unidadeAnalise,
@@ -281,11 +292,9 @@ const RegistrarCompraTab = () => {
       };
 
       await addPurchaseTransaction(insumoId, purchaseRecord, expenseRecord);
-
       showToast(
         `Compra registrada para ${selectedInsumo.nome} e despesa no Fluxo de Caixa!`,
       );
-
       resetPurchaseForm();
     } catch (error) {
       showToast('Erro ao registrar compra: ' + error.message, 'error');
@@ -328,9 +337,7 @@ const RegistrarCompraTab = () => {
           >
             Último preço pago:{' '}
             <strong>
-              {formatarValorPreciso(
-                lastPriceForSelectedInsumo.precoPorUnidadeAnalise,
-              )}
+              {formatarValor(lastPriceForSelectedInsumo.precoPorUnidadeAnalise)}
               /{selectedInsumo.unidadeAnalise}
             </strong>{' '}
             (Fornecedor:{' '}
@@ -413,7 +420,7 @@ const RegistrarCompraTab = () => {
               }}
             >
               Custo por {selectedInsumo?.unidadeAnalise || 'un'}:{' '}
-              {formatarValorPreciso(
+              {formatarValor(
                 parseFloat(
                   String(purchaseForm.precoTotalNota).replace(',', '.'),
                 ) /

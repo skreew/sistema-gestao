@@ -13,10 +13,7 @@ import {
   IconeEditar,
   IconeLixeira,
 } from '../../../utils/icons';
-import {
-  formatarWhatsappParaLink,
-  formatarWhatsappParaExibicao,
-} from '../../../utils/formatters';
+import { formatarWhatsappParaExibicao } from '../../../utils/formatters';
 import InputField from '../../../components/ui/forms/InputField';
 
 const GerenciarFornecedoresTab = ({ setActiveTab }) => {
@@ -29,7 +26,6 @@ const GerenciarFornecedoresTab = ({ setActiveTab }) => {
   const [busca, setBusca] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [formErrors, setFormErrors] = useState({});
-
   const nomeInputRef = useRef(null);
 
   useEffect(() => {
@@ -47,44 +43,68 @@ const GerenciarFornecedoresTab = ({ setActiveTab }) => {
   );
 
   const validateForm = async () => {
+    console.log('--- Executando validateForm ---');
     const errors = {};
-    if (!nome.trim()) {
-      errors.nome = 'O nome é obrigatório.';
-    } else {
-      const exists = await checkIfDocumentExists(
+    const numeroLimpo = whatsapp.replace(/\D/g, '');
+    console.log(`Número de WhatsApp limpo para verificação: '${numeroLimpo}'`);
+    console.log(
+      `Verificando se é edição. ID do documento sendo editado: ${editing}`,
+    );
+
+    if (!nome.trim()) errors.nome = 'O nome é obrigatório.';
+    if (!numeroLimpo) errors.whatsapp = 'O WhatsApp é obrigatório.';
+    else {
+      const isDuplicate = await checkIfDocumentExists(
         'fornecedores',
-        'nome',
-        nome.trim(),
-        editing ? editing.id : null,
+        'whatsapp',
+        numeroLimpo,
+        editing,
       );
-      if (exists) {
-        errors.nome = 'Já existe um fornecedor com este nome.';
+      console.log(
+        `Resultado da verificação de duplicidade: isDuplicate = ${isDuplicate}`,
+      );
+      if (isDuplicate) {
+        console.log(
+          'ERRO: Duplicidade encontrada! Adicionando erro ao formulário.',
+        );
+        errors.whatsapp = 'Este número de WhatsApp já está cadastrado.';
       }
     }
-    if (!whatsapp.trim()) errors.whatsapp = 'O WhatsApp é obrigatório.';
+
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    const formIsValid = Object.keys(errors).length === 0;
+    console.log(`Validação concluída. Formulário é válido? ${formIsValid}`);
+    return formIsValid;
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    console.log('--- Botão Salvar/Atualizar Clicado ---');
     if (isSaving) return;
 
     const isValid = await validateForm();
-    if (!isValid) return;
+    if (!isValid) {
+      console.log('O formulário é INVÁLIDO. Abortando salvamento.');
+      return;
+    }
 
+    console.log('O formulário é VÁLIDO. Prosseguindo com o salvamento.');
     setIsSaving(true);
-    const formattedNumber = formatarWhatsappParaLink(whatsapp);
+    // ... o resto da função de salvar continua igual
+    const numeroLimpo = whatsapp.replace(/\D/g, '');
     const data = {
       nome: nome.trim(),
-      whatsapp: formattedNumber,
-      observacoes: observacoes || null,
+      whatsapp: numeroLimpo,
+      observacoes: observacoes.trim() || null,
     };
+
     try {
       if (editing) {
-        await updateDocument('fornecedores', editing.id, data);
+        console.log(`EXECUTANDO ATUALIZAÇÃO para o ID: ${editing}`);
+        await updateDocument('fornecedores', editing, data);
         showToast('Fornecedor atualizado!');
       } else {
+        console.log(`EXECUTANDO CRIAÇÃO de novo fornecedor.`);
         await addDocument('fornecedores', data);
         showToast('Fornecedor salvo!');
       }
@@ -97,12 +117,14 @@ const GerenciarFornecedoresTab = ({ setActiveTab }) => {
   };
 
   const handleEdit = (f) => {
-    setEditing(f);
+    console.log(`--- Clicado em EDITAR no fornecedor ID: ${f.id} ---`);
+    setEditing(f.id);
     setNome(f.nome);
     setWhatsapp(f.whatsapp);
     setObservacoes(f.observacoes || '');
     setFormErrors({});
   };
+
   const handleDelete = (id) => {
     showConfirmationModal(
       'Tem certeza que deseja apagar este fornecedor?',
@@ -116,7 +138,9 @@ const GerenciarFornecedoresTab = ({ setActiveTab }) => {
       },
     );
   };
+
   const resetForm = () => {
+    console.log('--- Limpando o formulário (resetForm) ---');
     setEditing(null);
     setNome('');
     setWhatsapp('');
@@ -126,6 +150,7 @@ const GerenciarFornecedoresTab = ({ setActiveTab }) => {
 
   return (
     <div className="card" data-cy="card-gerenciar-fornecedores">
+      {/* O JSX aqui continua o mesmo */}
       <h2>
         <IconeCaminhao /> Gerenciar Fornecedores
       </h2>
@@ -240,12 +265,6 @@ const GerenciarFornecedoresTab = ({ setActiveTab }) => {
             <p className="sub-text">
               Registre seu primeiro fornecedor no formulário acima.
             </p>
-            <button
-              className="button-primary"
-              onClick={() => setActiveTab('insumos')}
-            >
-              Agora, registre um insumo
-            </button>
           </div>
         )}
       </div>

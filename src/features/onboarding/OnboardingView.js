@@ -1,12 +1,17 @@
-import React, { useTransition } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // PASSO 1: Importar o hook de navegação
 import { useAuth } from '../../context/Auth';
 import { useData } from '../../context/DataContext';
+import { PATHS } from '../../constants/paths'; // Importar os caminhos das rotas
 import { IconeCaminhao, IconeCheck, IconeCirculo } from '../../utils/icons';
+import { useUI } from '../../context/UIContext';
 
 const OnboardingView = () => {
+  const navigate = useNavigate(); // PASSO 2: Preparar a função de navegação
   const { user, updateOnboardingStatus } = useAuth();
   const { fornecedores, produtosDeCompra, produtos } = useData();
-  const [isPending, startTransition] = useTransition();
+  const { showToast } = useUI();
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const checklist = [
     {
@@ -28,14 +33,36 @@ const OnboardingView = () => {
   ];
   const allComplete = checklist.every((item) => item.isComplete);
 
+  const handleCompleteOnboarding = async () => {
+    if (isCompleting) return;
+    setIsCompleting(true);
+
+    try {
+      // Espera a atualização no Firebase ser concluída
+      await updateOnboardingStatus(user.uid, true);
+
+      showToast('Configuração concluída! Bem-vindo(a)!', 'success');
+
+      // PASSO 3: Forçar a navegação para o Dashboard
+      navigate(PATHS.DASHBOARD);
+    } catch (error) {
+      console.error('Falha ao completar o onboarding:', error);
+      showToast('Ocorreu um erro ao finalizar. Tente novamente.', 'error');
+      setIsCompleting(false);
+    }
+  };
+
   return (
     <div className="login-container">
       <div className="login-card card" style={{ maxWidth: '600px' }}>
         <h1>
-          <IconeCaminhao /> Primeiros Passos!
+          {' '}
+          <IconeCaminhao /> Primeiros Passos!{' '}
         </h1>
         <p>
-          Bem-vindo(a)! Complete os passos abaixo para configurar o sistema.
+          {' '}
+          Bem-vindo(a)! Complete os passos abaixo para configurar o
+          sistema.{' '}
         </p>
         <div className="divider" />
         <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left' }}>
@@ -64,15 +91,13 @@ const OnboardingView = () => {
           ))}
         </ul>
         <button
-          onClick={() =>
-            startTransition(() => updateOnboardingStatus(user.uid, true))
-          }
+          onClick={handleCompleteOnboarding}
           className="button-primary btn-full-width"
           style={{ marginTop: '1rem' }}
-          disabled={!allComplete || isPending}
+          disabled={!allComplete || isCompleting}
         >
-          {isPending
-            ? 'Processando...'
+          {isCompleting
+            ? 'Aguarde...'
             : allComplete
               ? 'Vamos Começar!'
               : 'Complete os passos para continuar'}
@@ -81,4 +106,5 @@ const OnboardingView = () => {
     </div>
   );
 };
+
 export default OnboardingView;

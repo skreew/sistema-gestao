@@ -5,24 +5,174 @@ import {
   addDocument,
   updateDocument,
   deleteDocument,
+  checkIfDocumentExists,
 } from '../../services/firestoreService';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '../../firebase';
 import {
   IconeFichaTecnica,
   IconeEditar,
   IconeLixeira,
   IconeMais,
   IconeRemover,
+  IconeCheck,
+  IconeAlerta,
 } from '../../utils/icons';
-import { formatarValor, formatarValorPreciso } from '../../utils/formatters';
+import { formatarValor } from '../../utils/formatters';
 import InputField from '../../components/ui/forms/InputField';
 import SelectField from '../../components/ui/forms/SelectField';
 
+// Sub-componente para gerenciar as categorias
+const GerenciarCategorias = () => {
+  const { showToast, showConfirmationModal } = useUI();
+  const [categorias, setCategorias] = useState([]);
+  const [nomeCategoria, setNomeCategoria] = useState('');
+  const [editingCategoria, setEditingCategoria] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, 'categorias'), orderBy('nome'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setCategorias(
+        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      );
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSaveCategoria = async (e) => {
+    e.preventDefault();
+    if (!nomeCategoria.trim() || isSaving) return;
+    setIsSaving(true);
+    try {
+      const isDuplicate = await checkIfDocumentExists(
+        'categorias',
+        'nome',
+        nomeCategoria.trim(),
+        editingCategoria?.id,
+      );
+      if (isDuplicate) {
+        showToast('Esta categoria já existe.', 'error');
+        setIsSaving(false);
+        return;
+      }
+      if (editingCategoria) {
+        await updateDocument('categorias', editingCategoria.id, {
+          nome: nomeCategoria.trim(),
+        });
+        showToast('Categoria atualizada!');
+      } else {
+        await addDocument('categorias', { nome: nomeCategoria.trim() });
+        showToast('Categoria criada!');
+      }
+      setNomeCategoria('');
+      setEditingCategoria(null);
+    } catch (error) {
+      showToast(`Erro: ${error.message}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteCategoria = (id) => {
+    showConfirmationModal(
+      'Apagar esta categoria não apaga os produtos já associados a ela. Deseja continuar?',
+      async () => {
+        try {
+          await deleteDocument('categorias', id);
+          showToast('Categoria apagada.');
+        } catch (error) {
+          showToast(`Erro: ${error.message}`, 'error');
+        }
+      },
+    );
+  };
+
+  return (
+    <div className="card">
+      <h4>Gerenciar Categorias de Produtos</h4>
+      <p className="small-tip">
+        Crie as categorias para organizar seus produtos, como "Pizzas",
+        "Bebidas" ou "Sobremesas".
+      </p>
+      <form onSubmit={handleSaveCategoria} className="form-group-inline">
+        <InputField
+          label={
+            editingCategoria
+              ? `Editando "${editingCategoria.nome}"`
+              : 'Nome da Nova Categoria'
+          }
+          value={nomeCategoria}
+          onChange={(e) => setNomeCategoria(e.target.value)}
+          placeholder="Ex: Lanches"
+        />
+        <button type="submit" className="button-primary" disabled={isSaving}>
+          {isSaving
+            ? 'Salvando...'
+            : editingCategoria
+              ? 'Atualizar'
+              : 'Adicionar'}
+        </button>
+        {editingCategoria && (
+          <button
+            type="button"
+            className="button-link"
+            onClick={() => {
+              setEditingCategoria(null);
+              setNomeCategoria('');
+            }}
+          >
+            Cancelar
+          </button>
+        )}
+      </form>
+      <div
+        className="list-container"
+        style={{ maxHeight: '300px', marginTop: '1.5rem' }}
+      >
+        {categorias.length > 0 ? (
+          categorias.map((cat) => (
+            <div key={cat.id} className="list-item">
+              <span>{cat.nome}</span>
+              <div className="list-item-actions">
+                <button
+                  className="button-icon"
+                  onClick={() => {
+                    setEditingCategoria(cat);
+                    setNomeCategoria(cat.nome);
+                  }}
+                  aria-label={`Editar ${cat.nome}`}
+                >
+                  <IconeEditar />
+                </button>
+                <button
+                  className="button-icon danger"
+                  onClick={() => handleDeleteCategoria(cat.id)}
+                  aria-label={`Apagar ${cat.nome}`}
+                >
+                  <IconeLixeira />
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="empty-state-inner">Nenhuma categoria criada.</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Sub-componente para gerenciar os produtos
 const GerenciarProdutosFinais = ({ isDisabled }) => {
   const { produtosDeCompra, produtos } = useData();
   const { showConfirmationModal, showToast } = useUI();
+  const [categorias, setCategorias] = useState([]);
+  const [isFormVisible, setIsFormVisible] = useState(false);
+
   const initialState = {
     nome: '',
-    categoria: '',
+    categoriaId: '',
     variantes: [
       {
         nomeVariante: 'Padrão',
@@ -32,19 +182,53 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
       },
     ],
   };
+
   const [formState, setFormState] = useState(initialState);
   const [editing, setEditing] = useState(null);
   const [varianteAtiva, setVarianteAtiva] = useState(0);
   const [selectedInsumoId, setSelectedInsumoId] = useState('');
   const [qtdInsumo, setQtdInsumo] = useState('');
   const [margemLucroPercentual, setMargemLucroPercentual] = useState(100);
-  const [margemLucroMonetaria, setMargemLucroMonetaria] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
-  const selectedInsumo = useMemo(() => {
-    return produtosDeCompra.find((p) => p.id === selectedInsumoId);
-  }, [selectedInsumoId, produtosDeCompra]);
+  useEffect(() => {
+    const q = query(collection(db, 'categorias'), orderBy('nome'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setCategorias(
+        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      );
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const produtosAgrupados = useMemo(() => {
+    return categorias
+      .map((categoria) => ({
+        ...categoria,
+        produtos: produtos.filter((p) => p.categoriaId === categoria.id),
+      }))
+      .filter((categoria) => categoria.produtos.length > 0);
+  }, [produtos, categorias]);
+
+  const activeVariante = formState.variantes[varianteAtiva];
+
+  const handleVarianteFieldChange = (field, value) => {
+    const novasVariantes = [...formState.variantes];
+    novasVariantes[varianteAtiva][field] = value;
+    setFormState({ ...formState, variantes: novasVariantes });
+    if (formErrors[`varianteNome${varianteAtiva}`]) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [`varianteNome${varianteAtiva}`]: '',
+      }));
+    }
+  };
+
+  const selectedInsumo = useMemo(
+    () => produtosDeCompra.find((p) => p.id === selectedInsumoId),
+    [selectedInsumoId, produtosDeCompra],
+  );
 
   const resetForm = () => {
     setEditing(null);
@@ -52,27 +236,17 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
     setVarianteAtiva(0);
     setFormErrors({});
     setMargemLucroPercentual(100);
-    setMargemLucroMonetaria(0);
+    setIsFormVisible(false);
   };
 
   const validateForm = () => {
     const errors = {};
     if (!formState.nome.trim())
       errors.nome = 'O nome do produto é obrigatório.';
-
+    if (!formState.categoriaId) errors.categoriaId = 'Selecione uma categoria.';
     formState.variantes.forEach((variante, index) => {
       if (!variante.nomeVariante.trim()) {
         errors[`varianteNome${index}`] = 'O nome da variante é obrigatório.';
-      }
-      if (
-        isNaN(parseFloat(String(variante.custoEmbalagem).replace(',', '.')))
-      ) {
-        errors[`custoEmbalagem${index}`] = 'Custo de embalagem inválido.';
-      }
-      if (
-        isNaN(parseFloat(String(variante.custoOperacional).replace(',', '.')))
-      ) {
-        errors[`custoOperacional${index}`] = 'Outros custos inválidos.';
       }
     });
     setFormErrors(errors);
@@ -81,13 +255,19 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      showToast('Por favor, preencha todos os campos obrigatórios.', 'error');
+      return;
+    }
     if (isSaving) return;
-
     setIsSaving(true);
+
     try {
+      const categoriaNome =
+        categorias.find((c) => c.id === formState.categoriaId)?.nome || '';
       const produtoData = {
         ...formState,
+        categoriaNome,
         variantes: formState.variantes.map((v) => {
           const custoTotalItens = v.fichaTecnica.reduce(
             (acc, item) => acc + item.custo,
@@ -101,15 +281,16 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
           );
           const cmvCalculado =
             custoTotalItens + custoEmbalagem + custoOperacional;
-          return { ...v, cmvCalculado };
+          return { ...v, custoEmbalagem, custoOperacional, cmvCalculado };
         }),
       };
+
       if (editing) {
         await updateDocument('produtosFinais', editing.id, produtoData);
-        showToast('Produto atualizado!');
+        showToast('Produto atualizado com sucesso!', 'success');
       } else {
         await addDocument('produtosFinais', produtoData);
-        showToast('Produto salvo!');
+        showToast('Produto salvo com sucesso!', 'success');
       }
       resetForm();
     } catch (error) {
@@ -120,16 +301,19 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
   };
 
   const handleAddItem = () => {
+    if (!selectedInsumoId || !qtdInsumo) {
+      showToast('Selecione o insumo e informe a quantidade primeiro.', 'error');
+      return;
+    }
     const insumo = produtosDeCompra.find((p) => p.id === selectedInsumoId);
     const qtd = parseFloat(String(qtdInsumo).replace(',', '.'));
     if (!insumo || isNaN(qtd) || qtd <= 0 || !insumo.bestPrice) {
-      showToast('Selecione um insumo com preço e quantidade válidos.', 'error');
+      showToast('Insumo inválido ou sem preço registrado.', 'error');
       return;
     }
 
     let displayUnit = insumo.unidadeAnalise;
     let conversionFactor = 1;
-
     if (insumo.unidadeAnalise === 'kg') {
       displayUnit = 'g';
       conversionFactor = 1000;
@@ -137,8 +321,8 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
       displayUnit = 'ml';
       conversionFactor = 1000;
     }
-    const quantidadeEmUnidadeAnalise = qtd / conversionFactor;
 
+    const quantidadeEmUnidadeAnalise = qtd / conversionFactor;
     const novoItem = {
       itemDeCompraId: insumo.id,
       nome: insumo.nome,
@@ -160,27 +344,25 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
   };
 
   const handleEdit = (p) => {
-    setEditing(p);
-    setFormState(p);
+    setEditing(p.id);
+    setFormState(JSON.parse(JSON.stringify(p)));
     setVarianteAtiva(0);
     setFormErrors({});
+    setIsFormVisible(true);
   };
-  const handleDelete = (id) =>
-    showConfirmationModal('Apagar este produto?', async () => {
-      try {
-        await deleteDocument('produtosFinais', id);
-        showToast('Produto apagado.');
-      } catch (error) {
-        showToast('Erro ao apagar: ' + error.message, 'error');
-      }
-    });
 
-  // const handleVarianteFieldChange = (field, value) => { // Removida função não utilizada
-  //   const novasVariantes = [...formState.variantes];
-  //   novasVariantes[varianteAtiva][field] = value;
-  //   setFormState({ ...formState, variantes: novasVariantes });
-  //   setFormErrors((prev) => ({ ...prev, [`${field}${varianteAtiva}`]: '' }));
-  // };
+  const handleDelete = (id) =>
+    showConfirmationModal(
+      'Apagar este produto e todas as suas variantes?',
+      async () => {
+        try {
+          await deleteDocument('produtosFinais', id);
+          showToast('Produto apagado.');
+        } catch (error) {
+          showToast(`Erro ao apagar: ${error.message}`, 'error');
+        }
+      },
+    );
 
   const handleAddVariante = () => {
     setFormState((prev) => ({
@@ -213,211 +395,237 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
   };
 
   const currentCmv = useMemo(() => {
-    if (!formState.variantes[varianteAtiva]) return 0;
-    const v = formState.variantes[varianteAtiva];
-    const custoItens = v.fichaTecnica.reduce(
+    if (!activeVariante) return 0;
+    const custoItens = activeVariante.fichaTecnica.reduce(
       (acc, item) => acc + item.custo,
       0,
     );
     const custoEmb = parseFloat(
-      String(v.custoEmbalagem || '0').replace(',', '.'),
+      String(activeVariante.custoEmbalagem || '0').replace(',', '.'),
     );
     const custoOp = parseFloat(
-      String(v.custoOperacional || '0').replace(',', '.'),
+      String(activeVariante.custoOperacional || '0').replace(',', '.'),
     );
     return custoItens + custoEmb + custoOp;
-  }, [formState, varianteAtiva]);
+  }, [activeVariante]);
 
-  useEffect(() => {
-    if (currentCmv > 0) {
-      setMargemLucroMonetaria(currentCmv * (margemLucroPercentual / 100));
-    } else {
-      setMargemLucroMonetaria(0);
-    }
-  }, [margemLucroPercentual, currentCmv]);
+  const precoSugerido = useMemo(() => {
+    return currentCmv * (1 + margemLucroPercentual / 100);
+  }, [currentCmv, margemLucroPercentual]);
 
-  useEffect(() => {
-    if (currentCmv > 0 && margemLucroMonetaria >= 0) {
-      setMargemLucroPercentual((margemLucroMonetaria / currentCmv) * 100);
-    } else if (currentCmv === 0 && margemLucroMonetaria > 0) {
-      setMargemLucroPercentual(Infinity);
-    } else {
-      setMargemLucroPercentual(0);
-    }
-  }, [margemLucroMonetaria, currentCmv]);
+  if (isFormVisible) {
+    return (
+      <div className={`card ${isDisabled ? 'disabled-card' : ''}`}>
+        {isDisabled && (
+          <div className="overlay-message">
+            <p>
+              Registre insumos com preço em 'Catálogo' para criar fichas
+              técnicas.
+            </p>
+          </div>
+        )}
+        <form onSubmit={handleSave} noValidate>
+          <fieldset>
+            <legend>Etapa 1: Identificação do Produto</legend>
+            <div className="form-grid-2-cols">
+              <InputField
+                label="Nome do Produto Final"
+                type="text"
+                value={formState.nome}
+                onChange={(e) =>
+                  setFormState({ ...formState, nome: e.target.value })
+                }
+                required
+                error={formErrors.nome}
+                placeholder="Ex: Pizza de Calabresa"
+              />
+              <SelectField
+                label="Categoria"
+                name="categoriaId"
+                value={formState.categoriaId}
+                onChange={(e) =>
+                  setFormState({ ...formState, categoriaId: e.target.value })
+                }
+                options={[
+                  {
+                    value: '',
+                    label: 'Selecione uma categoria...',
+                    disabled: true,
+                  },
+                  ...categorias.map((cat) => ({
+                    value: cat.id,
+                    label: cat.nome,
+                  })),
+                ]}
+                required
+                error={formErrors.categoriaId}
+              />
+            </div>
+          </fieldset>
 
-  return (
-    <div
-      className={`card ${isDisabled ? 'disabled-card' : ''}`}
-      data-cy="card-gerenciar-produtos-finais"
-    >
-      {isDisabled && (
-        <div className="overlay-message">
-          <p>
-            Registre insumos com preço em 'Catálogo' para criar fichas técnicas.
-          </p>
-        </div>
-      )}
-
-      <form onSubmit={handleSave}>
-        <div className="form-group-inline">
-          <InputField
-            label="Nome do Produto"
-            type="text"
-            value={formState.nome}
-            onChange={(e) => {
-              setFormState({ ...formState, nome: e.target.value });
-              setFormErrors((prev) => ({ ...prev, nome: '' }));
-            }}
-            placeholder="Ex: Pizza"
-            required
-            error={formErrors.nome}
-          />
-          <InputField
-            label="Categoria"
-            type="text"
-            value={formState.categoria}
-            onChange={(e) =>
-              setFormState({ ...formState, categoria: e.target.value })
-            }
-            placeholder="Ex: Pizzas Salgadas"
-          />
-        </div>
-
-        <div
-          className="variantes-tabs"
-          style={{
-            marginTop: '1.5rem',
-            borderBottom: 'none',
-            paddingBottom: 0,
-          }}
-        >
-          {formState.variantes.map((v, index) => (
-            <div
-              key={index}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <button
-                type="button"
-                className={varianteAtiva === index ? 'active' : ''}
-                onClick={() => setVarianteAtiva(index)}
+          <div className="variantes-tabs">
+            {formState.variantes.map((v, index) => (
+              <div
+                key={index}
+                style={{ display: 'flex', alignItems: 'center' }}
               >
-                {v.nomeVariante}
-              </button>
-              {formState.variantes.length > 1 && (
                 <button
                   type="button"
-                  className="button-icon small danger"
-                  onClick={() => handleRemoveVariante(index)}
-                  aria-label="Remover Variante"
+                  className={varianteAtiva === index ? 'active' : ''}
+                  onClick={() => setVarianteAtiva(index)}
                 >
-                  <IconeRemover />
+                  {v.nomeVariante}
                 </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            className="button-secondary"
-            onClick={handleAddVariante}
-          >
-            <IconeMais /> Adicionar Variante
-          </button>
-        </div>
-
-        <div className="variantes-manager">
-          <h4>
-            Detalhes da Variante:{' '}
-            {formState.variantes[varianteAtiva].nomeVariante}
-          </h4>
-          <div className="form-group-inline">
-            <SelectField
-              label="Insumo"
-              value={selectedInsumoId}
-              onChange={(e) => setSelectedInsumoId(e.target.value)}
-              options={[
-                { value: '', label: 'Selecione...', disabled: true },
-                ...produtosDeCompra
-                  .filter((p) => p.bestPrice)
-                  .map((p) => ({
-                    value: p.id,
-                    label: `${p.nome} - ${formatarValorPreciso(p.bestPrice)}/${p.unidadeAnalise}`,
-                  })),
-              ]}
-              aria-label="Selecione um item de compra"
-            />
-            <InputField
-              label={`Qtd (${selectedInsumo ? (selectedInsumo.unidadeAnalise === 'kg' ? 'g' : selectedInsumo.unidadeAnalise === 'L' ? 'ml' : 'un') : 'un'})`}
-              type="text"
-              value={qtdInsumo}
-              onChange={(e) => setQtdInsumo(e.target.value)}
-              placeholder={`Ex: 150 ${selectedInsumo ? (selectedInsumo.unidadeAnalise === 'kg' ? 'g' : selectedInsumo.unidadeAnalise === 'L' ? 'ml' : 'un') : ''}`}
-              aria-label="Quantidade do item de compra"
-            />
+                {formState.variantes.length > 1 && (
+                  <button
+                    type="button"
+                    className="button-icon small danger"
+                    onClick={() => handleRemoveVariante(index)}
+                    aria-label="Remover Variante"
+                  >
+                    <IconeRemover />
+                  </button>
+                )}
+              </div>
+            ))}
             <button
               type="button"
-              onClick={handleAddItem}
-              className="button-secondary"
-              disabled={!selectedInsumoId || !qtdInsumo}
-              aria-label="Adicionar item à ficha técnica"
+              className="button-icon-add-variant"
+              onClick={handleAddVariante}
+              title="Adicionar Nova Variante"
             >
-              +
+              <IconeMais />
             </button>
           </div>
 
-          <div
-            className="list-container"
-            style={{ maxHeight: '150px', borderTop: 'none', marginTop: 0 }}
-          >
-            {formState.variantes[varianteAtiva].fichaTecnica.length > 0 ? (
-              formState.variantes[varianteAtiva].fichaTecnica.map((item, i) => (
-                <div key={i} className="list-item">
-                  <p>
-                    {item.nome} - {item.quantidade} {item.unidade} (
-                    {formatarValor(item.custo)})
-                  </p>
+          {activeVariante && (
+            <div className="variantes-manager">
+              <fieldset>
+                <legend>Etapa 2: Receita da Variante</legend>
+                <InputField
+                  label="Nome da Variante"
+                  value={activeVariante.nomeVariante}
+                  onChange={(e) =>
+                    handleVarianteFieldChange('nomeVariante', e.target.value)
+                  }
+                  required
+                  error={formErrors[`varianteNome${varianteAtiva}`]}
+                  placeholder="Ex: Tamanho Família"
+                />
+                <div className="form-grid-2-cols">
+                  <InputField
+                    label="Custo Embalagem (R$)"
+                    type="number"
+                    step="0.01"
+                    value={activeVariante.custoEmbalagem}
+                    onChange={(e) =>
+                      handleVarianteFieldChange(
+                        'custoEmbalagem',
+                        e.target.value,
+                      )
+                    }
+                    placeholder="Ex: 2.50"
+                  />
+                  <InputField
+                    label="Outros Custos (R$)"
+                    type="number"
+                    step="0.01"
+                    value={activeVariante.custoOperacional}
+                    onChange={(e) =>
+                      handleVarianteFieldChange(
+                        'custoOperacional',
+                        e.target.value,
+                      )
+                    }
+                    placeholder="Ex: 1.00"
+                  />
+                </div>
+
+                <div className="divider-soft" />
+                <p className="small-tip">
+                  Adicione os ingredientes e quantidades usados para produzir
+                  este item.
+                </p>
+                <div className="form-group-inline">
+                  <SelectField
+                    label="Adicionar Insumo"
+                    value={selectedInsumoId}
+                    onChange={(e) => setSelectedInsumoId(e.target.value)}
+                    options={[
+                      { value: '', label: 'Selecione...', disabled: true },
+                      ...produtosDeCompra
+                        .filter((p) => p.bestPrice)
+                        .map((p) => ({ value: p.id, label: p.nome })),
+                    ]}
+                    aria-label="Selecionar Insumo para adicionar à receita"
+                  />
+                  <InputField
+                    label={`Qtd (${selectedInsumo ? (selectedInsumo.unidadeAnalise === 'kg' ? 'g' : selectedInsumo.unidadeAnalise === 'L' ? 'ml' : 'un') : 'un'})`}
+                    type="text"
+                    value={qtdInsumo}
+                    onChange={(e) => setQtdInsumo(e.target.value)}
+                    placeholder="Ex: 150"
+                  />
                   <button
                     type="button"
-                    className="button-icon danger"
-                    onClick={() => handleRemoveItem(i)}
+                    onClick={handleAddItem}
+                    className="button-secondary"
+                    style={{ alignSelf: 'flex-end' }}
                   >
-                    <IconeLixeira />
+                    +
                   </button>
                 </div>
-              ))
-            ) : (
-              <div
-                className="empty-state"
-                style={{ border: 'none', padding: '1rem', marginTop: '0.5rem' }}
-              >
-                <p className="sub-text">
-                  Adicione insumos à ficha técnica desta variante.
-                </p>
-              </div>
-            )}
-          </div>
-          <p
-            style={{
-              textAlign: 'right',
-              fontWeight: 'bold',
-              fontSize: '1.2rem',
-            }}
-          >
-            CMV Total da Variante: {formatarValor(currentCmv)}
-          </p>
 
-          <div
-            style={{
-              backgroundColor: 'var(--cor-secundaria)',
-              color: 'var(--cor-primaria)',
-              padding: '1rem',
-              borderRadius: '8px',
-              textAlign: 'center',
-              marginTop: '1.5rem',
-            }}
-          >
+                <div className="list-container" style={{ maxHeight: '150px' }}>
+                  {activeVariante.fichaTecnica.length > 0 ? (
+                    activeVariante.fichaTecnica.map((item, i) => (
+                      <div key={i} className="list-item">
+                        <p>
+                          {item.nome} - {item.quantidade}
+                          {item.unidade} ({formatarValor(item.custo)})
+                        </p>
+                        <button
+                          type="button"
+                          className="button-icon danger"
+                          onClick={() => handleRemoveItem(i)}
+                          aria-label={`Remover ${item.nome}`}
+                        >
+                          <IconeLixeira />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-state-inner">
+                      <p>
+                        <IconeAlerta /> Nenhum insumo adicionado a esta
+                        variante.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <p
+                  style={{
+                    textAlign: 'right',
+                    fontWeight: 'bold',
+                    fontSize: '1.2rem',
+                    marginTop: '1rem',
+                  }}
+                >
+                  CMV Total da Variante: {formatarValor(currentCmv)}
+                </p>
+              </fieldset>
+            </div>
+          )}
+
+          <fieldset className="card-calculadora-preco">
+            <legend>Etapa 3: Preço de Venda</legend>
+            <p className="small-tip">
+              Defina a margem de lucro desejada. O sistema sugere o preço final
+              automaticamente.
+            </p>
             <label htmlFor="margemLucroPercentual">
-              Margem de Lucro Desejada:
+              Margem de Lucro:{' '}
+              <strong>{Math.round(margemLucroPercentual)}%</strong>
             </label>
             <input
               type="range"
@@ -429,94 +637,110 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
                 setMargemLucroPercentual(parseFloat(e.target.value))
               }
             />
-            <span> {margemLucroPercentual.toFixed(0)}%</span>
+            <h4>Preço de Venda Sugerido:</h4>
+            <p className="preco-sugerido">{formatarValor(precoSugerido)}</p>
+          </fieldset>
 
-            <InputField
-              label="Margem de Lucro (R$)"
-              type="number"
-              value={margemLucroMonetaria.toFixed(2)}
-              onChange={(e) =>
-                setMargemLucroMonetaria(parseFloat(e.target.value) || 0)
-              }
-              step="0.01"
-              placeholder="0.00"
-            />
-
-            <h4 style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
-              Preço de Venda Sugerido:
-            </h4>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
-              {formatarValor(currentCmv + margemLucroMonetaria)}
-            </p>
+          <div
+            style={{
+              marginTop: '1.5rem',
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '1rem',
+            }}
+          >
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={resetForm}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="button-primary"
+              disabled={isSaving}
+            >
+              <IconeCheck />{' '}
+              {isSaving
+                ? editing
+                  ? 'Atualizando...'
+                  : 'Salvando...'
+                : editing
+                  ? 'Atualizar Produto Final'
+                  : 'Salvar Produto Final'}
+            </button>
           </div>
-        </div>
+        </form>
+      </div>
+    );
+  }
 
-        <button
-          type="submit"
-          className="button-primary"
-          style={{ marginTop: '1rem' }}
-          disabled={isSaving}
-        >
-          {isSaving
-            ? editing
-              ? 'Atualizando...'
-              : 'Salvando...'
-            : editing
-              ? 'Atualizar Produto'
-              : 'Salvar Novo Produto'}
-        </button>
-        {editing && (
-          <button type="button" onClick={resetForm} className="button-link">
-            Cancelar
-          </button>
-        )}
-      </form>
-
-      <div className="divider" />
+  return (
+    <div className="card">
       <h3>
         <IconeFichaTecnica /> Produtos Finais Registrados
       </h3>
+      <div style={{ marginBottom: '1rem' }}>
+        <button
+          className="button-primary"
+          onClick={() => setIsFormVisible(true)}
+        >
+          <IconeMais /> Cadastrar Novo Produto
+        </button>
+      </div>
       <div className="list-container">
         {produtos.length > 0 ? (
-          produtos.map((p) => (
-            <div key={p.id} className="card" style={{ marginBottom: '1rem' }}>
-              <div className="list-item" style={{ paddingBottom: 0 }}>
-                <h4 className="truncate-text">
-                  {p.nome} <span className="sub-text">{p.categoria}</span>
-                </h4>
-                <div>
-                  <button className="button-icon" onClick={() => handleEdit(p)}>
-                    <IconeEditar />
-                  </button>
-                  <button
-                    className="button-icon danger"
-                    onClick={() => handleDelete(p.id)}
-                  >
-                    <IconeLixeira />
-                  </button>
+          produtosAgrupados.map((categoria) => (
+            <details key={categoria.id} className="product-list-item" open>
+              <summary>
+                <div className="list-item-header category-header">
+                  <h4>{categoria.nome}</h4>
                 </div>
-              </div>
-              {p.variantes.map((v, i) => (
-                <div key={i} className="list-item">
-                  <strong>{v.nomeVariante}</strong>
-                  <div>
-                    <p>
-                      CMV: <strong>{formatarValor(v.cmvCalculado)}</strong>
-                    </p>
-                    <p className="sub-text">
-                      Preço Sugerido (Lucro 100%):{' '}
-                      {formatarValor(v.cmvCalculado * 2)}
-                    </p>
+              </summary>
+              {categoria.produtos.map((p) => (
+                <div key={p.id} className="product-sub-item">
+                  <div className="list-item-header">
+                    <h5>{p.nome}</h5>
+                    <div>
+                      <button
+                        className="button-icon"
+                        onClick={() => handleEdit(p)}
+                        aria-label={`Editar ${p.nome}`}
+                      >
+                        <IconeEditar />
+                      </button>
+                      <button
+                        className="button-icon danger"
+                        onClick={() => handleDelete(p.id)}
+                        aria-label={`Apagar ${p.nome}`}
+                      >
+                        <IconeLixeira />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="product-variant-list">
+                    {p.variantes.map((v, i) => (
+                      <div key={i} className="list-item">
+                        <span>{v.nomeVariante}</span>
+                        <span>
+                          CMV: <strong>{formatarValor(v.cmvCalculado)}</strong>
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
-            </div>
+            </details>
           ))
         ) : (
           <div className="empty-state">
             <IconeFichaTecnica />
             <h3>Nenhum Produto Final Registrado</h3>
-            <p className="sub-text">Crie sua primeira ficha técnica acima.</p>
+            <p className="sub-text">
+              Clique em "Cadastrar Novo Produto" para começar. É simples e
+              rápido!
+            </p>
           </div>
         )}
       </div>
@@ -524,7 +748,9 @@ const GerenciarProdutosFinais = ({ isDisabled }) => {
   );
 };
 
+// --- COMPONENTE PRINCIPAL (VIEW) ---
 const CmvView = () => {
+  const [activeTab, setActiveTab] = useState('produtos');
   const { produtosDeCompra } = useData();
   const isDisabled = !produtosDeCompra.some((item) => item.bestPrice);
 
@@ -532,15 +758,33 @@ const CmvView = () => {
     <div>
       <div className="card">
         <h2>
-          <IconeFichaTecnica /> Gerenciar Produtos Finais (Fichas Técnicas)
+          <IconeFichaTecnica /> Fichas Técnicas e Produtos
         </h2>
         <p>
-          Crie e gerencie as receitas dos seus produtos vendidos. O sistema
-          usará o <strong>melhor preço</strong> registrado de cada insumo para
-          calcular o Custo de Mercadoria Vendida (CMV) de forma automática.
+          Aqui você organiza seus produtos em categorias e cria as receitas
+          (fichas técnicas) para calcular o custo exato de cada item.
         </p>
       </div>
-      <GerenciarProdutosFinais isDisabled={isDisabled} />
+
+      <div className="variantes-tabs">
+        <button
+          className={activeTab === 'produtos' ? 'active' : ''}
+          onClick={() => setActiveTab('produtos')}
+        >
+          Gerenciar Produtos e Receitas
+        </button>
+        <button
+          className={activeTab === 'categorias' ? 'active' : ''}
+          onClick={() => setActiveTab('categorias')}
+        >
+          Gerenciar Categorias
+        </button>
+      </div>
+
+      {activeTab === 'produtos' && (
+        <GerenciarProdutosFinais isDisabled={isDisabled} />
+      )}
+      {activeTab === 'categorias' && <GerenciarCategorias />}
     </div>
   );
 };

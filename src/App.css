@@ -14,6 +14,276 @@
   --sombra-modal: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
+/* Estilos para a seção de gerenciamento de variantes */
+.variantes-manager {
+  border: 1px solid var(--cor-borda);
+  padding: 1.5rem;
+  border-radius: 0 8px 8px 8px;
+  margin-top: -2px; /* Alinha com a borda inferior das abas */
+  background-color: #fcfdff;
+}
+
+/* Botão de adicionar nova variante */
+.button-icon-add-variant {
+  background: none;
+  border: none;
+  border-bottom: 2px solid var(--cor-borda);
+  padding: 0.75rem;
+  cursor: pointer;
+  color: var(--cor-primaria);
+  transition: all 0.2s ease;
+}
+.button-icon-add-variant:hover {
+  background-color: var(--cor-secundaria);
+}
+
+/* Calculadora de Preço de Venda */
+.card-calculadora-preco {
+  border: 1px solid #e0e7ff;
+  background-color: #f0f6ff;
+  color: var(--cor-primaria-escura);
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  margin-top: 1.5rem;
+}
+.card-calculadora-preco label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.card-calculadora-preco input[type="range"] {
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 1rem;
+}
+.card-calculadora-preco .preco-sugerido {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--cor-sucesso);
+  margin: 0.5rem 0 0 0;
+}
+
+/* Estado vazio dentro de um card/lista */
+.empty-state-inner {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--cor-texto-claro);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.8;
+}
+.empty-state-inner .icon {
+    color: var(--cor-aviso);
+}
+
+/* Estilos para a seção de gerenciamento de variantes */
+.variantes-manager {
+  border: 1px solid var(--cor-borda);
+  padding: 1.5rem;
+  border-radius: 0 8px 8px 8px;
+  margin-top: -2px; /* Alinha com a borda inferior das abas */
+  background-color: #fcfdff;
+}
+
+/* Botão de adicionar nova variante */
+.button-icon-add-variant {
+  background: none;
+  border: none;
+  border-bottom: 2px solid var(--cor-borda);
+  padding: 0.75rem;
+  cursor: pointer;
+  color: var(--cor-primaria);
+  transition: all 0.2s ease;
+}
+.button-icon-add-variant:hover {
+  background-color: var(--cor-secundaria);
+}
+
+/* Calculadora de Preço de Venda */
+.card-calculadora-preco {
+  border: 1px solid #c9d5e8;
+  background-color: #f0f6ff;
+  color: var(--cor-primaria-escura);
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  margin-top: 1.5rem;
+}
+.card-calculadora-preco label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.card-calculadora-preco input[type="range"] {
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 1rem;
+}
+.card-calculadora-preco .preco-sugerido {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--cor-sucesso);
+  margin: 0.5rem 0 0 0;
+}
+
+/* Estado vazio dentro de um card/lista */
+.empty-state-inner {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--cor-texto-claro);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.8;
+  font-style: italic;
+}
+.empty-state-inner .icon {
+    color: var(--cor-aviso);
+}
+
+/* Texto de dica/ajuda */
+.small-tip {
+  font-size: 0.85rem;
+  color: var(--cor-texto-claro);
+  text-align: center;
+  margin: -0.5rem 0 1rem 0;
+}
+
+/* Lista de produtos agrupados por categoria */
+.product-list-item {
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  background-color: #fff;
+}
+.product-list-item summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+.product-list-item summary::-webkit-details-marker {
+  display: none;
+}
+.list-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.5rem;
+}
+.list-item-header.category-header {
+  background-color: var(--cor-secundaria);
+  padding: 0.75rem 1rem;
+  border-radius: 7px 7px 0 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+.product-sub-item {
+  padding: 0.5rem 1rem;
+  border-top: 1px dashed #eee;
+}
+.product-variant-list {
+    border-top: 1px dashed #e0e0e0;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+}
+.product-variant-list .list-item {
+    border: none;
+    padding: 0.5rem 0;
+}
+
+
+/* Lista de variantes dentro de um produto final */
+.product-variant-list {
+    border-top: 1px dashed var(--cor-borda);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+}
+.product-variant-list .list-item {
+    border-bottom: none; /* Remove bordas duplas */
+}
+
+
+/* Tabela de Histórico de Preços */
+.table-precos {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.table-precos th, .table-precos td {
+  border: 1px solid var(--cor-borda);
+  padding: 0.75rem;
+  text-align: left;
+  vertical-align: top; /* Alinha o conteúdo no topo da célula */
+}
+
+.table-precos th {
+  background-color: var(--cor-secundaria);
+  font-weight: 600;
+  color: var(--cor-primaria-escura);
+}
+
+.table-precos tbody tr:nth-child(even) {
+  background-color: #fdfdfd;
+}
+
+/* Layout em grade para formulários */
+.form-grid-2-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: flex-end;
+}
+.form-grid-2-cols > .form-group {
+  margin-bottom: 0;
+}
+
+/* Estilos para input com botão ao lado */
+.input-with-button {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.input-with-button > .form-group {
+  flex-grow: 1; /* Faz o select ocupar o máximo de espaço */
+}
+.button-link-add {
+  background: none;
+  border: 1px solid var(--cor-primaria);
+  color: var(--cor-primaria);
+  padding: 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  line-height: 1;
+  margin-bottom: 1rem; /* Alinha com o input */
+  transition: all 0.2s ease;
+}
+.button-link-add:hover {
+  background-color: var(--cor-secundaria);
+}
+
+/* Estilos para o Fieldset */
+fieldset {
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  padding: 1rem 1.5rem 1.5rem 1.5rem;
+  margin-top: 1.5rem;
+}
+
+legend {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--cor-primaria-escura);
+  padding: 0 0.5rem;
+  margin-left: 0.5rem;
+}
+
+
 body {
   margin: 0;
   font-family:

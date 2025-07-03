@@ -21,19 +21,17 @@ const DataContext = createContext();
 export const DataProvider = ({ children }) => {
   const { user } = useAuth();
   const [fornecedores, setFornecedores] = useState([]);
-  const [produtosDeCompra, setProdutosDeCompra] = useState([]); // Isso irá conter os dados enriquecidos
-  const [produtosDeCompraBase, setProdutosDeCompraBase] = useState([]); // Estado temporário para produtos sem histórico
+  const [produtosDeCompra, setProdutosDeCompra] = useState([]);
+  const [produtosDeCompraBase, setProdutosDeCompraBase] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [allPedidos, setAllPedidos] = useState([]);
   const [vendas, setVendas] = useState([]);
-  const [faturamentos, setFaturamentos] = useState([]);
-  const [despesas, setDespesas] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [, startTransition] = useTransition();
 
   const loadedCollections = useRef(new Set());
-  // Total de coleções para rastrear o carregamento inicial
-  const totalCollections = 7; // fornecedores, produtosFinais, pedidosRealizados, vendas, faturamentos, despesas, produtosDeCompra (enriquecidos)
+  // CORREÇÃO: Total de coleções reduzido para 5
+  const totalCollections = 5;
 
   const checkAllLoaded = () => {
     if (loadedCollections.current.size >= totalCollections) {
@@ -45,7 +43,6 @@ export const DataProvider = ({ children }) => {
     const unsubscribers = [];
 
     if (!user) {
-      // Redefine todos os estados quando o usuário faz logout
       startTransition(() => {
         setFornecedores([]);
         setProdutosDeCompra([]);
@@ -53,9 +50,7 @@ export const DataProvider = ({ children }) => {
         setProdutos([]);
         setAllPedidos([]);
         setVendas([]);
-        setFaturamentos([]);
-        setDespesas([]);
-        setLoadingData(false); // Define como false, pois não há dados para carregar
+        setLoadingData(false);
       });
       loadedCollections.current.clear();
       return;
@@ -92,7 +87,7 @@ export const DataProvider = ({ children }) => {
       unsubscribers.push(unsubscribe);
     };
 
-    // Listeners padrão para outras coleções
+    // CORREÇÃO: Listeners de 'faturamentos' e 'despesas' foram removidos daqui
     createSnapshotListener('fornecedores', setFornecedores, 'nome', 'asc');
     createSnapshotListener('produtosFinais', setProdutos, 'nome', 'asc');
     createSnapshotListener(
@@ -102,10 +97,7 @@ export const DataProvider = ({ children }) => {
       'desc',
     );
     createSnapshotListener('vendas', setVendas, 'dataVenda', 'desc');
-    createSnapshotListener('faturamentos', setFaturamentos, 'data', 'desc');
-    createSnapshotListener('despesas', setDespesas, 'data', 'desc');
 
-    // Listener para dados base de produtosDeCompra (ainda sem histórico)
     const qProdutosCompraBase = query(
       collection(db, 'produtosDeCompra'),
       orderBy('nome'),
@@ -119,98 +111,66 @@ export const DataProvider = ({ children }) => {
           );
         });
       },
-      (error) => {
-        console.error('Erro ao escutar a coleção produtosDeCompra:', error);
-      },
     );
     unsubscribers.push(unsubscribeProdutosDeCompraBase);
 
-    const initialLoadTimeout = setTimeout(() => {
-      if (loadingData) {
-        setLoadingData(false);
-        console.warn(
-          'O carregamento de dados expirou. Alguns dados podem não ter sido totalmente carregados.',
-        );
-      }
-    }, 15000);
-
     return () => {
       unsubscribers.forEach((unsub) => unsub());
-      clearTimeout(initialLoadTimeout);
     };
-  }, [user]); // Efeito depende apenas do usuário para reexecutar
+  }, [user]);
 
-  // Novo useEffect para buscar historicoPrecos uma vez que produtosDeCompraBase é carregado
   useEffect(() => {
-    // Prossiga apenas se houver um usuário logado
     if (!user) return;
 
-    // Condição para iniciar o enriquecimento de dados
-    if (
-      produtosDeCompraBase.length > 0 ||
-      (!loadedCollections.current.has('produtosDeCompra') &&
-        loadedCollections.current.has('fornecedores'))
-    ) {
-      const fetchAndEnrichProducts = async () => {
-        const itemsWithPricesPromises = produtosDeCompraBase.map(
-          async (item) => {
-            const historicoRef = collection(
-              db,
-              'produtosDeCompra',
-              item.id,
-              'historicoPrecos',
-            );
-            const historicoSnapshot = await getDocs(
-              query(historicoRef, orderBy('dataCompra', 'desc')),
-            );
+    const fetchAndEnrichProducts = async () => {
+      if (
+        produtosDeCompraBase.length === 0 &&
+        loadedCollections.current.size < totalCollections - 1
+      )
+        return;
 
-            const allPriceRecords = historicoSnapshot.docs.map((d) => ({
-              id: d.id,
-              ...d.data(),
-            }));
-
-            if (allPriceRecords.length > 0) {
-              const bestPriceRecord = [...allPriceRecords].sort(
-                (a, b) => a.precoPorUnidadeAnalise - b.precoPorUnidadeAnalise,
-              )[0];
-              item.bestPrice = bestPriceRecord.precoPorUnidadeAnalise;
-              item.bestPriceFornecedorId = bestPriceRecord.fornecedorId;
-            } else {
-              item.bestPrice = null;
-              item.bestPriceFornecedorId = null;
-            }
-            item.historicoPrecos = allPriceRecords;
-            return item;
-          },
+      const itemsWithPricesPromises = produtosDeCompraBase.map(async (item) => {
+        const historicoRef = collection(
+          db,
+          'produtosDeCompra',
+          item.id,
+          'historicoPrecos',
         );
+        const historicoSnapshot = await getDocs(
+          query(historicoRef, orderBy('data', 'desc')),
+        );
+        const allPriceRecords = historicoSnapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
 
-        const resolvedItems = await Promise.all(itemsWithPricesPromises);
-        startTransition(() => {
-          setProdutosDeCompra(resolvedItems);
-        });
-
-        if (!loadedCollections.current.has('produtosDeCompra')) {
-          loadedCollections.current.add('produtosDeCompra');
-          checkAllLoaded();
+        if (allPriceRecords.length > 0) {
+          const bestPriceRecord = [...allPriceRecords].sort(
+            (a, b) => a.precoPorUnidadeAnalise - b.precoPorUnidadeAnalise,
+          )[0];
+          item.bestPrice = bestPriceRecord.precoPorUnidadeAnalise;
+          item.bestPriceFornecedorId = bestPriceRecord.fornecedorId;
+        } else {
+          item.bestPrice = null;
+          item.bestPriceFornecedorId = null;
         }
-      };
-
-      // *** CORREÇÃO: Chamando a função para que ela seja executada ***
-      fetchAndEnrichProducts();
-    } else if (
-      produtosDeCompraBase.length === 0 &&
-      !loadedCollections.current.has('produtosDeCompra') &&
-      loadedCollections.current.has('fornecedores')
-    ) {
-      startTransition(() => {
-        setProdutosDeCompra([]);
+        item.historicoPrecos = allPriceRecords;
+        return item;
       });
+
+      const resolvedItems = await Promise.all(itemsWithPricesPromises);
+      startTransition(() => {
+        setProdutosDeCompra(resolvedItems);
+      });
+
       if (!loadedCollections.current.has('produtosDeCompra')) {
         loadedCollections.current.add('produtosDeCompra');
         checkAllLoaded();
       }
-    }
-  }, [produtosDeCompraBase, user]); // Depende de produtosDeCompraBase e user
+    };
+
+    fetchAndEnrichProducts();
+  }, [produtosDeCompraBase, user]);
 
   const value = {
     fornecedores,
@@ -218,9 +178,7 @@ export const DataProvider = ({ children }) => {
     produtos,
     allPedidos,
     vendas,
-    faturamentos,
-    despesas,
-    loadingData,
+    loadingData, // Faturamentos e Despesas foram removidos
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
