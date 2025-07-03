@@ -23,6 +23,9 @@ import {
   Users,
   Store,
   Eye,
+  AlertTriangle, // Adicionado
+  Check, // Adicionado
+  Eraser, // Adicionado
 } from 'lucide-react';
 
 const Icon = ({ children, ...props }) => (
@@ -43,14 +46,14 @@ export const IconeCarrinho = (props) => (
 );
 export const IconeLixeira = (props) => (
   <Icon {...props}>
-    <Trash2 size={24} />
+    <Trash2 size={20} />
   </Icon>
-);
+); // Tamanho ajustado
 export const IconeEditar = (props) => (
   <Icon {...props}>
-    <Pencil size={24} />
+    <Pencil size={20} />
   </Icon>
-);
+); // Tamanho ajustado
 export const IconeLogout = (props) => (
   <Icon {...props}>
     <LogOut size={24} />
@@ -58,9 +61,9 @@ export const IconeLogout = (props) => (
 );
 export const IconeBusca = (props) => (
   <Icon {...props}>
-    <Search size={24} />
+    <Search size={20} />
   </Icon>
-);
+); // Tamanho ajustado
 export const IconeCatalogo = (props) => (
   <Icon {...props}>
     <BookOpen size={24} />
@@ -83,9 +86,9 @@ export const IconeConfiguracoes = (props) => (
 );
 export const IconeCheck = (props) => (
   <Icon {...props}>
-    <CheckCircle size={24} />
+    <Check size={20} />
   </Icon>
-);
+); // Tamanho ajustado
 export const IconeCirculo = (props) => (
   <Icon {...props}>
     <Circle size={24} />
@@ -93,14 +96,14 @@ export const IconeCirculo = (props) => (
 );
 export const IconeMais = (props) => (
   <Icon {...props}>
-    <Plus size={24} />
+    <Plus size={20} />
   </Icon>
-);
+); // Tamanho ajustado
 export const IconeRemover = (props) => (
   <Icon {...props}>
-    <Minus size={24} />
+    <Minus size={20} />
   </Icon>
-);
+); // Tamanho ajustado
 export const IconeAnalises = (props) => (
   <Icon {...props}>
     <BarChart size={24} />
@@ -148,6 +151,16 @@ export const IconeVendas = (props) => (
 );
 export const IconeOlho = (props) => (
   <Icon {...props}>
-    <Eye size={24} />
+    <Eye size={20} />
+  </Icon>
+); // Tamanho ajustado
+export const IconeAlerta = (props) => (
+  <Icon {...props}>
+    <AlertTriangle size={18} />
+  </Icon>
+);
+export const IconeLimpar = (props) => (
+  <Icon {...props}>
+    <Eraser size={20} />
   </Icon>
 );

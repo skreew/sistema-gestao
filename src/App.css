@@ -52,7 +52,7 @@
   display: block;
   margin-bottom: 0.5rem;
 }
-.card-calculadora-preco input[type="range"] {
+.card-calculadora-preco input[type='range'] {
   width: 100%;
   max-width: 300px;
   margin-bottom: 1rem;
@@ -76,7 +76,7 @@
   opacity: 0.8;
 }
 .empty-state-inner .icon {
-    color: var(--cor-aviso);
+  color: var(--cor-aviso);
 }
 
 /* Estilos para a seção de gerenciamento de variantes */
@@ -117,7 +117,7 @@
   display: block;
   margin-bottom: 0.5rem;
 }
-.card-calculadora-preco input[type="range"] {
+.card-calculadora-preco input[type='range'] {
   width: 100%;
   max-width: 300px;
   margin-bottom: 1rem;
@@ -142,7 +142,7 @@
   font-style: italic;
 }
 .empty-state-inner .icon {
-    color: var(--cor-aviso);
+  color: var(--cor-aviso);
 }
 
 /* Texto de dica/ajuda */
@@ -185,26 +185,24 @@
   border-top: 1px dashed #eee;
 }
 .product-variant-list {
-    border-top: 1px dashed #e0e0e0;
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
+  border-top: 1px dashed #e0e0e0;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
 }
 .product-variant-list .list-item {
-    border: none;
-    padding: 0.5rem 0;
+  border: none;
+  padding: 0.5rem 0;
 }
-
 
 /* Lista de variantes dentro de um produto final */
 .product-variant-list {
-    border-top: 1px dashed var(--cor-borda);
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
+  border-top: 1px dashed var(--cor-borda);
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
 }
 .product-variant-list .list-item {
-    border-bottom: none; /* Remove bordas duplas */
+  border-bottom: none; /* Remove bordas duplas */
 }
-
 
 /* Tabela de Histórico de Preços */
 .table-precos {
@@ -214,7 +212,8 @@
   font-size: 0.9rem;
 }
 
-.table-precos th, .table-precos td {
+.table-precos th,
+.table-precos td {
   border: 1px solid var(--cor-borda);
   padding: 0.75rem;
   text-align: left;
@@ -282,7 +281,6 @@ legend {
   padding: 0 0.5rem;
   margin-left: 0.5rem;
 }
-
 
 body {
   margin: 0;
