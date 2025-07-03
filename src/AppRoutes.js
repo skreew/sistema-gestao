@@ -41,7 +41,7 @@ const AppRoutes = () => {
       return <Navigate to={PATHS.ONBOARDING} replace />;
     }
     if (allowedRoles && !allowedRoles.includes(userRole)) {
-      return <Navigate to={PATHS.DASHBOARD} replace />; // Redirect to dashboard if not authorized
+      return <Navigate to={PATHS.DASHBOARD} replace />; // Redirecionar para o dashboard se não autorizado
     }
     return children;
   };

@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
   const [userRole, setUserRole] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [, startTransition] = useTransition(); // Removed isPending as it's not used in UI
+  const [, startTransition] = useTransition(); // Removido isPending, pois não é usado na UI
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {

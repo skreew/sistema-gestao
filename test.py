@@ -862,13 +862,13 @@ Aplicação React refatorada para maior segurança, performance e manutenibilida
 * Fichas Técnicas: Calcule o Custo de Mercadoria Vendida (CMV) de forma precisa para cada produto.
 * Fluxo de Caixa: Controle todas as entradas e saídas financeiras.
 * Análises e Relatórios: Compare preços de insumos e visualize históricos.
-* Gestão de Utilizadores: Adicione e gira os acessos de colaboradores e gestores.
+* Gestão de Usuários: Adicione e gerencie os acessos de colaboradores e gestores.
 
 ## Como Iniciar
 
-1.  Criar Ficheiro de Ambiente (OBRIGATÓRIO):
-    * Na raiz do projeto (`sistema-gestao-final`), crie um ficheiro chamado `.env.local`.
-    * Copie o conteúdo do ficheiro `.env.example` para o `.env.local` e substitua pelas suas credenciais **reais** do Firebase.
+1.  Criar Arquivo de Ambiente (OBRIGATÓRIO):
+    * Na raiz do projeto (`sistema-gestao-final`), crie um arquivo chamado `.env.local`.
+    * Copie o conteúdo do arquivo `.env.example` para o `.env.local` e substitua pelas suas credenciais **reais** do Firebase.
 
 2.  Instale as Dependências:
     ```bash
@@ -882,15 +882,15 @@ Aplicação React refatorada para maior segurança, performance e manutenibilida
 
 4.  Configure as Regras de Segurança do Firestore:
     * Vá ao seu painel do Firebase > Firestore Database > Rules.
-    * Copie o conteúdo do ficheiro `firestore.rules` (na raiz do projeto) e cole no editor de regras do Firebase.
+    * Copie o conteúdo do arquivo `firestore.rules` (na raiz do projeto) e cole no editor de regras do Firebase.
     * Clique em "Publicar".
 
 5.  Primeiro Acesso:
-    * No painel de 'Authentication' do seu projeto Firebase, crie manualmente o seu primeiro utilizador (será o gestor principal).
-    * Na base de dados 'Firestore', crie uma coleção chamada 'users'.
-    * Dentro de 'users', crie um documento com o mesmo UID do utilizador que criou.
+    * No painel de 'Authentication' do seu projeto Firebase, crie manualmente seu primeiro usuário (será o gestor principal).
+    * No banco de dados 'Firestore', crie uma coleção chamada 'users'.
+    * Dentro de 'users', crie um documento com o mesmo UID do usuário que você criou no passo 1.
     * Dentro desse documento, adicione um campo 'role' (string) com o valor 'gestor'.
-    * Agora, aceda à aplicação (http://localhost:3000) com as credenciais do gestor que criou.
+    * Agora, acesse a aplicação (http://localhost:3000) com as credenciais do gestor que você criou.
 """)
 
 # Conteúdo para postcss.config.js
@@ -957,7 +957,7 @@ const AppRoutes = () => {
       return <Navigate to={PATHS.ONBOARDING} replace />;
     }
     if (allowedRoles && !allowedRoles.includes(userRole)) {
-      return <Navigate to={PATHS.DASHBOARD} replace />; // Redirect to dashboard if not authorized
+      return <Navigate to={PATHS.DASHBOARD} replace />; // Redirecionar para o dashboard se não autorizado
     }
     return children;
   };
@@ -1072,7 +1072,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-// Import necessary context providers
+// Importa os provedores de contexto necessários
 import { AuthProvider } from './context/Auth';
 import { DataProvider } from './context/DataContext';
 import { UIProvider } from './context/UIContext';
@@ -1090,28 +1090,28 @@ root.render(
   </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-// reportWebVitals(); // Removed unused function call
+// Se você quiser começar a medir o desempenho em seu aplicativo, passe uma função
+// para registrar os resultados (por exemplo: reportWebVitals(console.log))
+// ou envie para um ponto de extremidade de análise. Saiba mais: https://bit.ly/CRA-vitals
+// reportWebVitals(); // Chamada de função não utilizada removida
 """)
 
 # Conteúdo para .gitignore
 GITIGNORE_CONTENT = textwrap.dedent("""
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Veja https://help.github.com/articles/ignoring-files/ para mais sobre ignorar arquivos.
 
-# dependencies
+# dependências
 /node_modules
 /.pnp
 .pnp.js
 
-# testing
+# testes
 /coverage
 
-# production
+# produção
 /build
 
-# misc
+# diversos
 .DS_Store
 .env.local
 .env.development.local
@@ -1122,14 +1122,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# editor directories and files
+# diretórios e arquivos do editor
 .idea
 .vscode/*
 !.vscode/extensions.json
 .history
 """)
 
-# Conteúdo para src/components/auth/AccessSelectionPage.js (CORRIGIDO)
+# Conteúdo para src/components/auth/AccessSelectionPage.js (CORRIGIDO E PT-BR)
 ACCESS_SELECTION_PAGE_JS_CONTENT = textwrap.dedent("""
 import React, { useState } from 'react';
 import { useAuth } from '../../context/Auth';
@@ -1335,7 +1335,7 @@ import './App.css';
 
 function App() {
   return (
-    <> {/* Added React Fragment to wrap adjacent JSX elements */}
+    <> {/* Adicionado React Fragment para envolver elementos JSX adjacentes */}
       <Toaster
         position='top-right'
         toastOptions={{
@@ -1354,7 +1354,7 @@ function App() {
 export default App;
 """)
 
-# Content for src/context/Auth.js (CORRIGIDO)
+# Content for src/context/Auth.js (CORRIGIDO E PT-BR)
 AUTH_CONTEXT_JS_CONTENT = textwrap.dedent("""
 import React, { createContext, useState, useEffect, useContext, useTransition } from 'react';
 import {
@@ -1373,7 +1373,7 @@ export const AuthProvider = ({ children }) => {
   const [userRole, setUserRole] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [, startTransition] = useTransition(); // Removed isPending as it's not used in UI
+  const [, startTransition] = useTransition(); // Removido isPending, pois não é usado na UI
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -1461,7 +1461,7 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => useContext(AuthContext);
 """)
 
-# Content for src/context/DataContext.js (CORRIGIDO)
+# Content for src/context/DataContext.js (CORRIGIDO E PT-BR)
 DATA_CONTEXT_JS_CONTENT = textwrap.dedent("""
 import React, { createContext, useState, useEffect, useContext, useRef, useTransition } from 'react';
 import {
@@ -1471,7 +1471,7 @@ import {
   orderBy,
   getDocs,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } => '../firebase';
 import { useAuth } from './Auth';
 
 const DataContext = createContext();
@@ -1479,19 +1479,19 @@ const DataContext = createContext();
 export const DataProvider = ({ children }) => {
   const { user } = useAuth();
   const [fornecedores, setFornecedores] = useState([]);
-  const [produtosDeCompra, setProdutosDeCompra] = useState([]); // This will hold the enriched data
-  const [produtosDeCompraBase, setProdutosDeCompraBase] = useState([]); // Temporary state for products without history
+  const [produtosDeCompra, setProdutosDeCompra] = useState([]); // Isso irá conter os dados enriquecidos
+  const [produtosDeCompraBase, setProdutosDeCompraBase] = useState([]); // Estado temporário para produtos sem histórico
   const [produtos, setProdutos] = useState([]);
   const [allPedidos, setAllPedidos] = useState([]);
   const [vendas, setVendas] = useState([]);
   const [faturamentos, setFaturamentos] = useState([]);
   const [despesas, setDespesas] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [, startTransition] = useTransition(); // Removed isPending as it's not used in UI
+  const [, startTransition] = useTransition(); // Removido isPending, pois não é usado na UI
 
   const loadedCollections = useRef(new Set());
-  // Total collections to track for initial loading, including the enriched produtosDeCompra
-  const totalCollections = 7; // fornecedores, produtosFinais, pedidosRealizados, vendas, faturamentos, despesas, produtosDeCompra (enriched)
+  // Total de coleções para rastrear o carregamento inicial, incluindo os produtosDeCompra (enriquecidos)
+  const totalCollections = 7; // fornecedores, produtosFinais, pedidosRealizados, vendas, faturamentos, despesas, produtosDeCompra (enriquecidos)
 
   const checkAllLoaded = () => {
     if (loadedCollections.current.size >= totalCollections) {
@@ -1503,11 +1503,11 @@ export const DataProvider = ({ children }) => {
     const unsubscribers = [];
 
     if (!user) {
-      // Reset all states when user logs out
+      // Redefine todos os estados quando o usuário faz logout
       startTransition(() => {
         setFornecedores([]);
         setProdutosDeCompra([]);
-        setProdutosDeCompraBase([]); // Reset this too
+        setProdutosDeCompraBase([]); // Redefine isso também
         setProdutos([]);
         setAllPedidos([]);
         setVendas([]);
@@ -1539,7 +1539,7 @@ export const DataProvider = ({ children }) => {
       unsubscribers.push(unsubscribe);
     };
 
-    // Standard listeners for other collections
+    // Listeners padrão para outras coleções
     createSnapshotListener('fornecedores', setFornecedores, 'nome', 'asc');
     createSnapshotListener('produtosFinais', setProdutos, 'nome', 'asc');
     createSnapshotListener('pedidosRealizados', setAllPedidos, 'criadoEm', 'desc');
@@ -1547,8 +1547,8 @@ export const DataProvider = ({ children }) => {
     createSnapshotListener('faturamentos', setFaturamentos, 'data', 'desc');
     createSnapshotListener('despesas', setDespesas, 'data', 'desc');
 
-    // Listener for base produtosDeCompra data (without history yet)
-    // This will populate produtosDeCompraBase, and a separate effect will enrich it
+    // Listener para dados base de produtosDeCompra (ainda sem histórico)
+    // Isso irá popular produtosDeCompraBase, e um efeito separado irá enriquecê-lo
     const qProdutosCompraBase = query(collection(db, 'produtosDeCompra'), orderBy('nome'));
     const unsubscribeProdutosDeCompraBase = onSnapshot(qProdutosCompraBase, (snapshot) => {
       startTransition(() => {
@@ -1558,13 +1558,13 @@ export const DataProvider = ({ children }) => {
     });
     unsubscribers.push(unsubscribeProdutosDeCompraBase);
 
-    // Set a timeout to eventually stop loading if something goes wrong
+    // Define um tempo limite para eventualmente parar o carregamento se algo der errado
     const initialLoadTimeout = setTimeout(() => {
       if (loadingData) {
         setLoadingData(false);
         console.warn('O carregamento de dados expirou. Alguns dados podem não ter sido totalmente carregados.');
       }
-    }, 15000); // 15 seconds timeout
+    }, 15000); // Tempo limite de 15 segundos
 
     return () => {
       unsubscribers.forEach(unsub => unsub());
@@ -1603,11 +1603,9 @@ export const DataProvider = ({ children }) => {
 
         // Marca produtosDeCompra como carregado somente após seu histórico ser buscado
         if (!loadedCollections.current.has('produtosDeCompra')) {
-          loadedCollections.current.add('produtosDeCompra');
-          checkAllLoaded();
+            loadedCollections.current.add('produtosDeCompra');
+            checkAllLoaded();
         }
-      };
-      fetchAndEnrichProducts();
     } else if (produtosDeCompraBase.length === 0 && !loadedCollections.current.has('produtosDeCompra') && loadedCollections.current.has('fornecedores')) {
         // Se produtosDeCompraBase estiver vazio, mas outras coleções estiverem carregadas, e produtosDeCompra não estiver marcado,
         // então marca produtosDeCompra como carregado (com um array vazio).
@@ -1875,7 +1873,7 @@ const LoadingScreen = () => {
 export default LoadingScreen;
 """)
 
-# Content for src/features/dashboard/DashboardView.js (CORRIGIDO)
+# Content for src/features/dashboard/DashboardView.js (CORRIGIDO E PT-BR)
 DASHBOARD_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useMemo } from 'react';
 import { useData } from '../../context/DataContext';
@@ -1893,7 +1891,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
-import { formatarValor } from '../../utils/formatters'; // Mantido, pois formatarValor é usado no JSX
+import { formatarValor } from '../../utils/formatters'; // eslint-disable-line no-unused-vars -- Usado no JSX para formatar valores
 
 ChartJS.register(
   CategoryScale,
@@ -2055,7 +2053,7 @@ const DashboardView = () => {
 export default DashboardView;
 """)
 
-# Content for src/features/cadastros/CatalogoView.js (CORRIGIDO)
+# Content for src/features/cadastros/CatalogoView.js (CORRIGIDO E PT-BR)
 CADASTROS_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useTransition } from 'react';
 import { IconeCatalogo } from '../../utils/icons';
@@ -2130,7 +2128,7 @@ const CatalogoView = () => {
 export default CatalogoView;
 """)
 
-# Content for src/features/cadastros/tabs/GerenciarFornecedoresTab.js
+# Content for src/features/cadastros/tabs/GerenciarFornecedoresTab.js (PT-BR)
 GERENCIAR_FORNECEDORES_TAB_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useUI } from '../../../context/UIContext';
@@ -2378,7 +2376,7 @@ const GerenciarFornecedoresTab = ({ setActiveTab }) => {
 export default GerenciarFornecedoresTab;
 """)
 
-# Content for src/features/cadastros/tabs/GerenciarInsumosTab.js (CORRIGIDO)
+# Content for src/features/cadastros/tabs/GerenciarInsumosTab.js (CORRIGIDO E PT-BR)
 GERENCIAR_INSUMOS_TAB_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useUI } from '../../../context/UIContext';
@@ -2647,7 +2645,7 @@ const GerenciarInsumosTab = ({ setActiveTab }) => {
 export default GerenciarInsumosTab;
 """)
 
-# Content for src/features/cadastros/tabs/RegistrarCompraTab.js (CORRIGIDO)
+# Content for src/features/cadastros/tabs/RegistrarCompraTab.js (CORRIGIDO E PT-BR)
 REGISTRAR_COMPRA_TAB_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react'; // Removido import useEffect não utilizado
 import { useUI } from '../../../context/UIContext';
@@ -3084,7 +3082,7 @@ const RegistrarCompraTab = () => {
 export default RegistrarCompraTab;
 """)
 
-# Content for src/features/cadastros/tabs/GerenciarPrecosInsumosTab.js
+# Content for src/features/cadastros/tabs/GerenciarPrecosInsumosTab.js (PT-BR)
 GERENCIAR_PRECOS_INSUMOS_TAB_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react';
 import { useUI } from '../../../context/UIContext';
@@ -3320,7 +3318,7 @@ const GerenciarPrecosInsumosTab = () => {
 export default GerenciarPrecosInsumosTab;
 """)
 
-# Content for src/features/cmv/CmvView.js (CORRIGIDO)
+# Content for src/features/cmv/CmvView.js (CORRIGIDO E PT-BR)
 CMV_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
@@ -3798,7 +3796,7 @@ const CmvView = () => {
 export default CmvView;
 """)
 
-# Content for src/features/fluxoDeCaixa/FluxoDeCaixaView.js
+# Content for src/features/fluxoDeCaixa/FluxoDeCaixaView.js (CORRIGIDO E PT-BR)
 FLUXO_DE_CAIXA_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
@@ -4353,7 +4351,7 @@ const FluxoDeCaixaView = () => {
 export default FluxoDeCaixaView;
 """)
 
-# Content for src/features/pedidos/PedidosView.js
+# Content for src/features/pedidos/PedidosView.js (PT-BR)
 PEDIDOS_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
@@ -4710,7 +4708,7 @@ const PedidosView = () => {
 export default PedidosView;
 """)
 
-# Content for src/features/relatorios/RelatoriosView.js (CORRIGIDO)
+# Content for src/features/relatorios/RelatoriosView.js (CORRIGIDO E PT-BR)
 RELATORIOS_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useTransition } from 'react';
 import { IconeAnalises } from '../../utils/icons';
@@ -4766,7 +4764,7 @@ const RelatoriosView = () => {
 export default RelatoriosView;
 """)
 
-# Content for src/features/relatorios/AnaliseDeCustoInsumo.js
+# Content for src/features/relatorios/AnaliseDeCustoInsumo.js (PT-BR)
 ANALISE_CUSTO_INSUMO_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
@@ -4909,7 +4907,7 @@ const AnaliseDeCustoInsumo = () => {
 export default AnaliseDeCustoInsumo;
 """)
 
-# Content for src/features/relatorios/HistoricoView.js
+# Content for src/features/relatorios/HistoricoView.js (PT-BR)
 HISTORICO_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
@@ -5045,7 +5043,7 @@ const HistoricoView = () => {
 export default HistoricoView;
 """)
 
-# Content for src/features/relatorios/HistoricoComprasFornecedorView.js
+# Content for src/features/relatorios/HistoricoComprasFornecedorView.js (PT-BR)
 HISTORICO_COMPRAS_FORNECEDOR_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
@@ -5158,7 +5156,7 @@ const HistoricoComprasFornecedorView = () => {
 export default HistoricoComprasFornecedorView;
 """)
 
-# Content for src/features/onboarding/OnboardingView.js
+# Content for src/features/onboarding/OnboardingView.js (PT-BR)
 ONBOARDING_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useTransition } from 'react';
 import { useAuth } from '../../context/Auth';
@@ -5228,7 +5226,7 @@ const OnboardingView = () => {
 export default OnboardingView;
 """)
 
-# Content for src/features/userManagement/UserManagementView.js (CORRIGIDO)
+# Content for src/features/userManagement/UserManagementView.js (CORRIGIDO E PT-BR)
 USER_MANAGEMENT_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState } from 'react';
 import { useAuth } from '../../context/Auth';
@@ -5352,7 +5350,7 @@ const UserManagementView = () => {
 export default UserManagementView;
 """)
 
-# Content for src/features/vendas/VendasView.js
+# Content for src/features/vendas/VendasView.js (PT-BR)
 VENDAS_VIEW_JS_CONTENT = textwrap.dedent("""
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
@@ -5561,7 +5559,7 @@ const VendasView = () => {
 export default VendasView;
 """)
 
-# Content for src/features/vendas/SaleDetailModal.js
+# Content for src/features/vendas/SaleDetailModal.js (PT-BR)
 SALE_DETAIL_MODAL_JS_CONTENT = textwrap.dedent("""
 import React from 'react';
 import Modal from '../../components/ui/Modal';
@@ -5638,7 +5636,7 @@ const SaleDetailModal = ({ sale, onClose }) => {
 export default SaleDetailModal;
 """)
 
-# Content for src/components/ComparativePricesModal/ComparativePricesModal.js
+# Content for src/components/ComparativePricesModal/ComparativePricesModal.js (PT-BR)
 COMPARATIVE_PRICES_MODAL_JS_CONTENT = textwrap.dedent("""
 import React, { useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
@@ -6005,7 +6003,7 @@ PROJECT_STRUCTURE = {
         "firestore.rules": FIRESTORE_RULES_CONTENT,
         "public": {
             "index.html": INDEX_HTML_CONTENT,
-            "favicon.ico": "", # Placeholder, you might want to add a real one
+            "favicon.ico": "", # Placeholder, você pode adicionar um real
             "logo192.png": "", # Placeholder
             "logo512.png": "", # Placeholder
             "manifest.json": '{"short_name":"GestãoPRO","name":"Sistema de Gestão PRO","start_url":".","display":"standalone","theme_color":"#000000","background_color":"#ffffff"}',

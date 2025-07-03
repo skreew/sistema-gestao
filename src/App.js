@@ -7,7 +7,7 @@ function App() {
   return (
     <>
       {' '}
-      {/* Added React Fragment to wrap adjacent JSX elements */}
+      {/* Adicionado React Fragment para envolver elementos JSX adjacentes */}
       <Toaster
         position="top-right"
         toastOptions={{

@@ -21,19 +21,19 @@ const DataContext = createContext();
 export const DataProvider = ({ children }) => {
   const { user } = useAuth();
   const [fornecedores, setFornecedores] = useState([]);
-  const [produtosDeCompra, setProdutosDeCompra] = useState([]); // This will hold the enriched data
-  const [produtosDeCompraBase, setProdutosDeCompraBase] = useState([]); // Temporary state for products without history
+  const [produtosDeCompra, setProdutosDeCompra] = useState([]); // Isso irá conter os dados enriquecidos
+  const [produtosDeCompraBase, setProdutosDeCompraBase] = useState([]); // Estado temporário para produtos sem histórico
   const [produtos, setProdutos] = useState([]);
   const [allPedidos, setAllPedidos] = useState([]);
   const [vendas, setVendas] = useState([]);
   const [faturamentos, setFaturamentos] = useState([]);
   const [despesas, setDespesas] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [, startTransition] = useTransition(); // Removed isPending as it's not used in UI
+  const [, startTransition] = useTransition();
 
   const loadedCollections = useRef(new Set());
-  // Total collections to track for initial loading, including the enriched produtosDeCompra
-  const totalCollections = 7; // fornecedores, produtosFinais, pedidosRealizados, vendas, faturamentos, despesas, produtosDeCompra (enriched)
+  // Total de coleções para rastrear o carregamento inicial
+  const totalCollections = 7; // fornecedores, produtosFinais, pedidosRealizados, vendas, faturamentos, despesas, produtosDeCompra (enriquecidos)
 
   const checkAllLoaded = () => {
     if (loadedCollections.current.size >= totalCollections) {
@@ -45,17 +45,17 @@ export const DataProvider = ({ children }) => {
     const unsubscribers = [];
 
     if (!user) {
-      // Reset all states when user logs out
+      // Redefine todos os estados quando o usuário faz logout
       startTransition(() => {
         setFornecedores([]);
         setProdutosDeCompra([]);
-        setProdutosDeCompraBase([]); // Reset this too
+        setProdutosDeCompraBase([]);
         setProdutos([]);
         setAllPedidos([]);
         setVendas([]);
         setFaturamentos([]);
         setDespesas([]);
-        setLoadingData(false);
+        setLoadingData(false); // Define como false, pois não há dados para carregar
       });
       loadedCollections.current.clear();
       return;
@@ -74,21 +74,25 @@ export const DataProvider = ({ children }) => {
         collection(db, collectionName),
         orderBy(orderField, orderDirection),
       );
-      const unsubscribe = onSnapshot(q, (s) => {
-        startTransition(() => {
-          setStateFunc(s.docs.map((d) => ({ ...d.data(), id: d.id })));
-        });
-        if (!loadedCollections.current.has(collectionName)) {
-          loadedCollections.current.add(collectionName);
-          // Sempre chame checkAllLoaded após uma coleção ser processada, independentemente do nome.
-          // O tratamento especial para 'produtosDeCompra' está em seu useEffect dedicado.
-          checkAllLoaded();
-        }
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (s) => {
+          startTransition(() => {
+            setStateFunc(s.docs.map((d) => ({ ...d.data(), id: d.id })));
+          });
+          if (!loadedCollections.current.has(collectionName)) {
+            loadedCollections.current.add(collectionName);
+            checkAllLoaded();
+          }
+        },
+        (error) => {
+          console.error(`Erro ao escutar a coleção ${collectionName}:`, error);
+        },
+      );
       unsubscribers.push(unsubscribe);
     };
 
-    // Standard listeners for other collections
+    // Listeners padrão para outras coleções
     createSnapshotListener('fornecedores', setFornecedores, 'nome', 'asc');
     createSnapshotListener('produtosFinais', setProdutos, 'nome', 'asc');
     createSnapshotListener(
@@ -101,8 +105,7 @@ export const DataProvider = ({ children }) => {
     createSnapshotListener('faturamentos', setFaturamentos, 'data', 'desc');
     createSnapshotListener('despesas', setDespesas, 'data', 'desc');
 
-    // Listener for base produtosDeCompra data (without history yet)
-    // This will populate produtosDeCompraBase, and a separate effect will enrich it
+    // Listener para dados base de produtosDeCompra (ainda sem histórico)
     const qProdutosCompraBase = query(
       collection(db, 'produtosDeCompra'),
       orderBy('nome'),
@@ -115,12 +118,13 @@ export const DataProvider = ({ children }) => {
             snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
           );
         });
-        // Não chame checkAllLoaded aqui, pois a busca do histórico é uma etapa separada.
+      },
+      (error) => {
+        console.error('Erro ao escutar a coleção produtosDeCompra:', error);
       },
     );
     unsubscribers.push(unsubscribeProdutosDeCompraBase);
 
-    // Set a timeout to eventually stop loading if something goes wrong
     const initialLoadTimeout = setTimeout(() => {
       if (loadingData) {
         setLoadingData(false);
@@ -128,17 +132,20 @@ export const DataProvider = ({ children }) => {
           'O carregamento de dados expirou. Alguns dados podem não ter sido totalmente carregados.',
         );
       }
-    }, 15000); // 15 seconds timeout
+    }, 15000);
 
     return () => {
       unsubscribers.forEach((unsub) => unsub());
       clearTimeout(initialLoadTimeout);
     };
-  }, [user, loadingData]); // Depende do usuário para reexecutar quando a autenticação muda
+  }, [user]); // Efeito depende apenas do usuário para reexecutar
 
   // Novo useEffect para buscar historicoPrecos uma vez que produtosDeCompraBase é carregado
   useEffect(() => {
-    // Prossiga apenas se produtosDeCompraBase tiver dados ou se estiver vazio, mas precisamos marcá-lo como carregado
+    // Prossiga apenas se houver um usuário logado
+    if (!user) return;
+
+    // Condição para iniciar o enriquecimento de dados
     if (
       produtosDeCompraBase.length > 0 ||
       (!loadedCollections.current.has('produtosDeCompra') &&
@@ -177,26 +184,24 @@ export const DataProvider = ({ children }) => {
           },
         );
 
-        // Resolve todas as promessas de busca de subcoleções
         const resolvedItems = await Promise.all(itemsWithPricesPromises);
         startTransition(() => {
-          setProdutosDeCompra(resolvedItems); // Atualiza o estado principal de produtosDeCompra com dados enriquecidos
+          setProdutosDeCompra(resolvedItems);
         });
 
-        // Marca produtosDeCompra como carregado somente após seu histórico ser buscado
         if (!loadedCollections.current.has('produtosDeCompra')) {
           loadedCollections.current.add('produtosDeCompra');
           checkAllLoaded();
         }
       };
+
+      // *** CORREÇÃO: Chamando a função para que ela seja executada ***
       fetchAndEnrichProducts();
     } else if (
       produtosDeCompraBase.length === 0 &&
       !loadedCollections.current.has('produtosDeCompra') &&
       loadedCollections.current.has('fornecedores')
     ) {
-      // Se produtosDeCompraBase estiver vazio, mas outras coleções estiverem carregadas, e produtosDeCompra não estiver marcado,
-      // então marca produtosDeCompra como carregado (com um array vazio).
       startTransition(() => {
         setProdutosDeCompra([]);
       });
@@ -209,7 +214,7 @@ export const DataProvider = ({ children }) => {
 
   const value = {
     fornecedores,
-    produtosDeCompra, // Isso agora contém os dados enriquecidos
+    produtosDeCompra,
     produtos,
     allPedidos,
     vendas,
@@ -217,6 +222,7 @@ export const DataProvider = ({ children }) => {
     despesas,
     loadingData,
   };
+
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };
 

@@ -14,7 +14,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
-import { formatarValor } from '../../utils/formatters'; // Mantido, pois formatarValor é usado no JSX
+import { formatarValor } from '../../utils/formatters'; // eslint-disable-line no-unused-vars -- Usado no JSX para formatar valores
 
 ChartJS.register(
   CategoryScale,
